@@ -20,4 +20,8 @@ The server binds to `127.0.0.1:3001` by default. An optional third argument chan
 
 Send `Authorization: Bearer <token>` to the two dev-only routes. Attempts also require an `Idempotency-Key` of 1–80 ASCII alphanumeric, hyphen or underscore characters beginning with a letter or digit. The first answer returns `201`. A byte-equivalent typed answer repeated with the same key returns `200`. A different answer with that key returns `409`. Frozen task answers stay private.
 
-The generation and evaluation job routes, worker progress, metrics export and connected UI require the renderer, independently verified task packages and run integration.
+## Judge console interfaces
+
+The Next.js server exposes `POST /api/jobs` to start local generation and `GET /api/jobs/{id}` for status. The Task Factory launches the Python generator and serves only the verified bundle for the active job. A job result can expire when a different bundle becomes active. Axum imports, serves, and scores the selected bundle.
+
+The console uses `POST /inspector/evidence` for authorized local evidence and `GET /reports/export` for approved aggregate fields. Model evaluation runs through the [Python CLI](../evals/runner.md). The current Axum interface covers artifact import, tasks, attempts, and reveal. Worker scheduling lives in the web process.

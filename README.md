@@ -75,11 +75,11 @@ flowchart LR
 | --- | --- |
 | Implementation and repeatability · 25% | Seeded generator, grouped export, CLI smoke, dataset audit, and local judge console. Windows browser checks and Linux CI passed. Compose build/startup and macOS core tests passed. [Reproduction guide](docs/reproducibility.md) |
 | Validity · 25% | Independent raster recovery on **19 of 20** clean scenes, with exact agreement on all 19 recoveries. Independent Python/Rust rules agreed on **1,000** seeded scenes. Human review is pending. [Validation](docs/validation.md) |
-| Meaningful variation · 20% | Audited v0.2 holdout with **696** answerable tasks, **545** frozen, **282** valid question pairs, and **40** separate diagnostics. The balanced frozen X cohorts have zero measured marginal ALARM cue shift. [Dataset card](docs/dataset_card.md) |
+| Meaningful variation · 20% | Audited v0.2 holdout with **696** answerable tasks and **282** valid pairs. The expanded public v0.3 build has **688** answerable tasks across three layouts, including **181** tasks in the new two-pump column layout. Measured runs default to the balanced X scope. [Dataset card](docs/dataset_card.md) |
 | Originality and engineering judgment · 15% | Visible readings, independent checks, matched input conditions, and pair-preserving shortcut controls. A 50-task development cohort passed C0/C1/C3 preflight. Live-model findings are pending. [Evaluation status](docs/evaluation_results.md) · [Prior-work audit](docs/source_audit.md) |
 | Practical impact and communication · 15% | Generate, answer, compare, and reveal evidence in the browser. The walkthrough shows a rule-threshold error and a formatting-only change. The automated browser rehearsal passed. The timed presentation is pending. [Demo walkthrough](submission/demo_script.md) |
 
-The verifier is scoped to clean synthetic renders. The current generator has one pressure-rule family and two panel layouts. Human review is **0 of 50**, and the repository has **no live model results**. The screenshot below shows the reporting interface on an offline run, with fixture outputs labeled **DEMO ONLY**. [Evaluation status and limits](docs/evaluation_results.md)
+The production verifier is scoped to clean synthetic renders. The expanded generator covers one pressure-rule family and three panel layouts. Human review is **0 of 50**, and the repository has **no live model results**. The screenshot below shows the reporting interface on an offline run, with fixture outputs labeled **DEMO ONLY**. [Evaluation status and limits](docs/evaluation_results.md)
 
 ![PanelProof Run Reports with a DEMO ONLY label, condition filters, valid-only and all-attempt accuracy columns, and an export link](docs/assets/run-reports-demo.png)
 

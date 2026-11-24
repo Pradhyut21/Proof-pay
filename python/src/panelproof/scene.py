@@ -170,13 +170,22 @@ def layout_pump(pump: Pump, rect: tuple[int, int, int, int]) -> None:
     pump.module = rect
     area_x0, area_x1 = x0 + 16, x1 - LAMP_COL_W
     area_y0, area_y1 = y0 + 64, y1 - 16
-    cell_w = (area_x1 - area_x0) // 2
-    r = min(150, cell_w // 2 - 12, (area_y1 - area_y0 - 40) // 2)
-    cy = area_y0 + (area_y1 - area_y0 - 40) // 2
-    for i, g in enumerate(pump.gauges):
-        g.cx = area_x0 + cell_w * i + cell_w // 2
-        g.cy = cy
-        g.r = r
+    if y1 - y0 > x1 - x0:
+        # A tall module stacks full-size dials and leaves space for each visible caption.
+        slot_h = (area_y1 - area_y0) // 2
+        radius = min(150, (area_x1 - area_x0) // 2 - 12, (slot_h - 56) // 2)
+        for i, gauge in enumerate(pump.gauges):
+            gauge.cx = (area_x0 + area_x1) // 2
+            gauge.cy = area_y0 + slot_h * i + (slot_h - 44) // 2
+            gauge.r = radius
+    else:
+        cell_w = (area_x1 - area_x0) // 2
+        r = min(150, cell_w // 2 - 12, (area_y1 - area_y0 - 40) // 2)
+        cy = area_y0 + (area_y1 - area_y0 - 40) // 2
+        for i, g in enumerate(pump.gauges):
+            g.cx = area_x0 + cell_w * i + cell_w // 2
+            g.cy = cy
+            g.r = r
     lx = x1 - LAMP_COL_W // 2 - 4
     yc = (y0 + 64 + y1) // 2
     pump.lamps = {name: (lx, yc + (-1 if i == 0 else 1) * 62, 24) for i, name in enumerate(pump.lamp_order)}
@@ -242,8 +251,17 @@ def generate_scene(seed: str, cfg: dict[str, Any] | None = None) -> Scene:
     cfg = cfg or load_config()
     rng = random.Random(seed)
     n = rng.randint(cfg["pumps"]["min"], cfg["pumps"]["max"])
-    # "cols" yields dials below the 70 px legibility floor (see check_layout), so only rows are generated.
     arrangement = "single" if n == 1 else "rows"
+    if n == 2 and "two_pump_arrangements" in cfg:
+        choices = cfg["two_pump_arrangements"]
+        if (
+            not isinstance(choices, (list, tuple))
+            or not choices
+            or any(choice not in ("rows", "cols") for choice in choices)
+        ):
+            raise ValueError("two_pump_arrangements must contain rows or cols")
+        # The layout choice cannot change the sampled readings, labels or theme.
+        arrangement = random.Random(f"{seed}:arrangement").choice(choices)
     pumps = [_sample_pump(rng, cfg, chr(ord("A") + i)) for i in range(n)]
     for p, rect in zip(pumps, module_rects(n, arrangement), strict=True):
         layout_pump(p, rect)
