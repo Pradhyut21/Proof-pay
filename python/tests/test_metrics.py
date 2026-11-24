@@ -299,6 +299,9 @@ def test_measured_report_checks_holdout_approval_and_source_runs(tmp_path):
     assert report["banner"] == "MEASURED"
     assert report["provenance"]["models"] == [{**identity, "run_ids": ["fixture-C0", "fixture-C1", "fixture-C3"]}]
     assert report["provenance"]["c3_observations_sha256"] == observations.digest
+    assert report["provenance"]["x_scope"] == "balanced" and report["provenance"]["x_task_count"] == 0
+    with pytest.raises(PermissionError, match="approval for the requested X scope"):
+        main_metrics([*full, "--x-scope", "full"])
     assert report["provenance"]["public_inputs_sha256"] == digests
 
     image.write_bytes(image_bytes + b"changed")

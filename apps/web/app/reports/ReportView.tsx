@@ -398,6 +398,12 @@ export function ReportView({
                 Dataset manifest SHA-256{" "}
                 <code>{data.report.provenance.dataset_manifest_sha256}</code>
               </p>
+              {data.report.provenance.x_scope && data.report.provenance.x_task_count !== null && (
+                <p className="text-sm">
+                  X scope {data.report.provenance.x_scope} · {data.report.provenance.x_task_count}{" "}
+                  consistency tasks
+                </p>
+              )}
               <ul className="space-y-1 text-sm">
                 {data.report.provenance.models.map((model) => (
                   <li key={model.model_id} className="break-all">

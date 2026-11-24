@@ -368,27 +368,87 @@ def _solve_pump(run: bool, delta: int, u: int) -> tuple[str | None, str | None]:
     return None, "uncertainty_spans_class_boundary"
 
 
-def verify_png(png: bytes) -> dict[str, Any]:
-    arr = cv2.imdecode(np.frombuffer(png, np.uint8), cv2.IMREAD_COLOR)
-    trace: dict[str, Any] = {
+def _frame_pixels(img: np.ndarray) -> np.ndarray:
+    return np.concatenate(
+        [img[:8].reshape(-1, 3), img[-8:].reshape(-1, 3), img[:, :8].reshape(-1, 3), img[:, -8:].reshape(-1, 3)]
+    )
+
+
+def _mild_frame_noise(img: np.ndarray) -> bool:
+    frame = _frame_pixels(img)
+    deviation = np.abs(frame - np.median(frame, axis=0))
+    return bool(1 <= np.median(deviation) <= 3 and np.quantile(deviation, 0.95) <= 9)
+
+
+def _small_panel_skew(img: np.ndarray) -> float | None:
+    """Estimate a global tilt from long near-perpendicular panel edges."""
+    edge_map = cv2.Canny(cv2.cvtColor(img, cv2.COLOR_BGR2GRAY), 35, 90)
+    min_length = max(120, min(img.shape[:2]) // 4)
+    segments = cv2.HoughLinesP(edge_map, 1, np.pi / 720, 60, minLineLength=min_length, maxLineGap=12)
+    if segments is None:
+        return None
+    horizontal, vertical = [], []
+    for x0, y0, x1, y1 in segments.reshape(-1, 4):
+        dx, dy = int(x1) - int(x0), int(y1) - int(y0)
+        angle = (math.degrees(math.atan2(dy, dx)) + 45) % 90 - 45
+        if abs(angle) <= 2:
+            (horizontal if abs(dx) > abs(dy) else vertical).append(angle)
+    if not horizontal or not vertical:
+        return None
+    h, v = float(np.median(horizontal)), float(np.median(vertical))
+    angle = (h + v) / 2
+    return angle if abs(h - v) <= 0.25 and 0.30 <= abs(angle) <= 1.50 else None
+
+
+def _geometry_mask(mask: np.ndarray, *, clean_noise: bool) -> np.ndarray:
+    binary = mask.astype(np.uint8)
+    if clean_noise:
+        return cv2.morphologyEx(binary, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
+    return binary
+
+
+def verify_png(png: bytes, *, recover_small_distortions: bool = False) -> dict[str, Any]:
+    arr = cv2.imdecode(np.frombuffer(png, np.uint8), cv2.IMREAD_COLOR) if png else None
+    metadata: dict[str, Any] = {
         "verifier_version": VERIFIER_VERSION,
         "image_sha256": hashlib.sha256(png).hexdigest(),
         "tolerances": TOLERANCES,
-        "pumps": [],
-        "rejections": [],
     }
+    trace = _verify_image(arr, metadata)
+    if not recover_small_distortions or arr is None or trace["status"] == "verified":
+        return trace
+
+    angle = _small_panel_skew(arr)
+    clean_noise = _mild_frame_noise(arr)
+    if angle is None and not clean_noise:
+        return trace
+    if angle is not None:
+        height, width = arr.shape[:2]
+        transform = cv2.getRotationMatrix2D((width / 2, height / 2), angle, 1)
+        arr = cv2.warpAffine(arr, transform, (width, height), borderMode=cv2.BORDER_REPLICATE)
+    retry = _verify_image(arr, metadata, clean_noise=clean_noise)
+    retry["normalization"] = {
+        "deskew_degrees": round(angle, 3) if angle is not None else None,
+        "geometry_noise_cleanup": clean_noise,
+        "coordinate_frame": "deskewed" if angle is not None else "source",
+    }
+    return retry
+
+
+def _verify_image(
+    arr: np.ndarray | None, metadata: dict[str, Any], *, clean_noise: bool = False
+) -> dict[str, Any]:
+    trace: dict[str, Any] = {**metadata, "pumps": [], "rejections": []}
     if arr is None:
         trace["rejections"].append("png_decode_failed")
         trace["status"] = "rejected"
         return trace
     h, w = arr.shape[:2]
     trace["image"] = {"width": w, "height": h}
-    frame = np.concatenate(
-        [arr[:8].reshape(-1, 3), arr[-8:].reshape(-1, 3), arr[:, :8].reshape(-1, 3), arr[:, -8:].reshape(-1, 3)]
-    )
-    bg = _mode_color(frame)
+    bg = _mode_color(_frame_pixels(arr))
     diff = np.abs(arr.astype(np.int16) - np.array(bg, np.int16)).max(axis=2)
-    mask = cv2.morphologyEx((diff > 10).astype(np.uint8), cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8))
+    mask = _geometry_mask(diff > 10, clean_noise=clean_noise)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8))
     cnts, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     mods = sorted((cv2.boundingRect(c) for c in cnts if cv2.contourArea(c) > 60000), key=lambda r: (r[1], r[0]))
     if not mods:
@@ -400,7 +460,7 @@ def verify_png(png: bytes) -> dict[str, Any]:
         fill = _mode_color(arr[my + 5 : my + mh - 5, mx + 5 : mx + mw - 5])
         inner = (mx + 6, my + 6, mx + mw - 6, my + mh - 6)
         sub = arr[inner[1] : inner[3], inner[0] : inner[2]].astype(np.int16)
-        m2 = (np.abs(sub - np.array(fill, np.int16)).max(axis=2) > 12).astype(np.uint8)
+        m2 = _geometry_mask(np.abs(sub - np.array(fill, np.int16)).max(axis=2) > 12, clean_noise=clean_noise)
         cs, _ = cv2.findContours(m2, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         gauges, lamps = [], []
         for c in cs:

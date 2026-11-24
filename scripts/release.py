@@ -43,6 +43,7 @@ REQUIRED_NESTED_SOURCE = {
     "infra/docker/web.Dockerfile",
 }
 PUBLIC_DOCUMENTATION_ASSETS = {
+    "docs/assets/column-layout.png",
     "docs/assets/counterfactuals.png",
     "docs/assets/evidence-inspector.png",
     "docs/assets/run-reports-demo.png",
@@ -51,6 +52,7 @@ PUBLIC_DOCUMENTATION_ASSETS = {
     "docs/results/human_audit_status.json",
     "docs/results/integration_pilot.md",
     "docs/results/perturbation.json",
+    "docs/results/small_distortion_study.json",
     "docs/results/smoke_report.json",
     "docs/results/smoke_report_demo.md",
 }

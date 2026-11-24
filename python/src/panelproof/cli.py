@@ -5,6 +5,7 @@ panelproof verify   --dataset DIR [--out FILE]
 panelproof variants --dataset DIR
 panelproof build-dataset --config configs/benchmark.yaml --out DIR [--holdout-seed-file FILE]
 panelproof audit-dataset --dataset DIR [--rebuild-config CONFIG] [--holdout-seed-file FILE]
+panelproof prepare-measured-cohort --dataset DIR --out FILE [--split SPLITS] [--x-scope balanced|full]
 panelproof metrics --tasks DIR --attempts FILE --out DIR
 """
 
@@ -115,11 +116,16 @@ def main(argv: list[str] | None = None) -> int:
     v = sub.add_parser("verify", help="independent raster verification of a generated directory")
     v.add_argument("--dataset", required=True)
     v.add_argument("--out", default=None)
-    pt = sub.add_parser("perturb", help="verifier agreement under moderate perturbations")
+    pt = sub.add_parser("perturb", help="verifier agreement under moderate perturbations", allow_abbrev=False)
     pt.add_argument("--dataset", required=True)
     pt.add_argument("--limit", type=int, default=60)
     pt.add_argument("--workers", type=int, default=4)
     pt.add_argument("--out", default=None)
+    pt.add_argument("--generator-config", type=Path, default=None)
+    from .perturb import SUPPORTED_AXES
+
+    pt.add_argument("--axes", nargs="+", choices=SUPPORTED_AXES)
+    pt.add_argument("--recover-small-distortions", action="store_true")
     da = sub.add_parser("demo-attempts", help="offline mock attempts (DEMO ONLY)")
     da.add_argument("--dataset", required=True)
     da.add_argument("--out", required=True)
@@ -129,7 +135,7 @@ def main(argv: list[str] | None = None) -> int:
     fa.add_argument("--count", type=int, required=True)
     fa.add_argument("--out", required=True)
     fa.add_argument("--difficulty", default="medium", choices=["easy", "medium", "hard"])
-    for name in ("build-dataset", "audit-dataset", "metrics", "variants"):
+    for name in ("build-dataset", "audit-dataset", "prepare-measured-cohort", "metrics", "variants"):
         sub.add_parser(name, add_help=False)
     args, rest = ap.parse_known_args(argv)
 
@@ -158,7 +164,16 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "perturb":
         from .perturb import run_perturbations
 
-        res = run_perturbations(Path(args.dataset), args.limit, min(args.workers, MAX_WORKERS))
+        if rest:
+            ap.error("unrecognized perturb arguments: " + " ".join(rest))
+        res = run_perturbations(
+            Path(args.dataset),
+            args.limit,
+            min(args.workers, MAX_WORKERS),
+            axes=args.axes,
+            generator_config=args.generator_config,
+            recover_small_distortions=args.recover_small_distortions,
+        )
         if args.out:
             Path(args.out).parent.mkdir(parents=True, exist_ok=True)
             Path(args.out).write_text(json.dumps(res, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -172,6 +187,10 @@ def main(argv: list[str] | None = None) -> int:
         from .export import main_audit
 
         return main_audit(rest)
+    if args.cmd == "prepare-measured-cohort":
+        from .measured_cohort import main_prepare_measured
+
+        return main_prepare_measured(rest)
     if args.cmd == "metrics":
         from .metrics import main_metrics
 

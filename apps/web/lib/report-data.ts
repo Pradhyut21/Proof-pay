@@ -165,11 +165,17 @@ function measuredManifest(value: unknown, modelIds: string[]) {
   if (actual.size !== modelIds.length || modelIds.some((id) => !actual.has(id))) {
     throw new Error("Measured model provenance does not match report");
   }
+  const xScope = row.x_scope;
+  if (xScope !== undefined && xScope !== "balanced" && xScope !== "full") {
+    throw new Error("Invalid measured X scope");
+  }
   return {
     dataset_manifest_sha256: digest(row.dataset_manifest_sha256),
     selection_hash: digest(row.selection_hash),
     c3_observations_sha256: digest(row.c3_observations_sha256),
     public_inputs_sha256: named(row.public_inputs_sha256, reportConditions, digest),
+    x_scope: xScope ?? null,
+    x_task_count: row.x_task_count === undefined ? null : count(row.x_task_count),
     models,
   };
 }

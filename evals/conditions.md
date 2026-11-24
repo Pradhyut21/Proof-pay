@@ -14,9 +14,18 @@ Metrics compare conditions on **matched tasks only**. Tasks missing a condition 
 
 ## Measured runs need a freeze
 
+Prepare the default balanced cohort from the privately seeded holdout before requesting model access. The command writes a new JSONL file outside the holdout and Git and prints the selection hash, scope, and aggregate count. The rows contain the public task fields. Keep the file local because its membership is derived from the private selection.
+
+```sh
+uv run --project python --python 3.11 --locked python -m panelproof.cli prepare-measured-cohort \
+  --dataset /local/holdout --out /local/measurement/tasks.jsonl
+```
+
+The default includes frozen R, C, and M tasks and the complete manifest-committed balanced X slice for each chosen split. Use the printed `selected_count` as `--limit` in each C0, C1, and C3 preflight and run. Further truncating the JSONL may break matched coverage or X balance. The full holdout stays unchanged. To study the separate full X scope, use `--x-scope full` for both cohort preparation and measured reporting, and record `"x_scope": "full"` in the local approval. If X tasks are included, the measured report checks complete membership of the chosen X scope for every represented split. An explicitly approved selection may omit X, in which case its measured X count is zero.
+
 Use `--measured --attempt-format contract` only with a privately seeded holdout built by the exporter. Supply its dataset directory via `--tasks`, one `--attempts` argument per run, and `--approval` pointing to the team’s local authorization record. Keep each attempt file alongside its original `run.json`. Each model must cover an identical nonempty cohort under C0, C1, and C3. The report checks the holdout's role and hashes and the model provenance. It re-reads the manifest-pinned public task list and PNGs, recovers visible readings locally, and verifies the exact prompts and image bytes recorded by the runner under each condition. It also checks the C3 observation digest independently. Public reproducibility builds, development and diagnostic tasks, and mock attempts are rejected. A partial cohort with skipped tasks or missing conditions can be inspected as a development report.
 
-The authorization record includes `approved_by`, the holdout's `manifest_sha256`, the `selection_hash` from `panelproof.metrics.selection_hash(task_ids, conditions)`, and `models`, an array of objects with `provider`, `model_id`, and `model_revision`. This selection hash covers the approved unordered task IDs and conditions. The runner's separate `selected_task_ids_sha256` covers the ordered rows within each run. Include approved limits and exact run commands in the team's local lock record before requesting model inference.
+The authorization record includes `approved_by`, the holdout's `manifest_sha256`, the `selection_hash` from `panelproof.metrics.selection_hash(task_ids, conditions)`, and `models`, an array of objects with `provider`, `model_id`, and `model_revision`. Its `x_scope` defaults to `balanced`. This selection hash covers the approved unordered task IDs and conditions. The runner's separate `selected_task_ids_sha256` covers the ordered rows within each run. Include approved limits and exact run commands in the team's local lock record before requesting model inference.
 
 The reporting gate validates artifacts after inference. Obtain authorization and commit to the selected task IDs and conditions before starting requests. A report assembled without `--measured` is labeled development or **DEMO ONLY**. The provider runner accepts C0, C1, and C3. C3 preflights the entire cohort by recovering readings directly from PNGs and uses only the visible observations described in [`runner.md`](runner.md).
 

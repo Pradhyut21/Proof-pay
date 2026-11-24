@@ -1,0 +1,142 @@
+{
+  "dataset_manifest_sha256": "d100da22ce547859d93be6ecd48c4ec491bc295a96374d71f15069f0f93ab963",
+  "generator_config_sha256": "e0353a66244bb034c977fc66b060892369963ff9fd906104b9caf81426976eef",
+  "opencv_version": "5.1.0",
+  "recovery": {
+    "axes": {
+      "gaussian_noise_sigma3": {
+        "accepted_non_exact": 0,
+        "agreement_rate": 0.58,
+        "false_accept_rate": 0.0,
+        "n": 100,
+        "normalization_attempts": 95,
+        "rejected": 42,
+        "top_rejection_reasons": {
+          "missing_gauge_INLET": 70,
+          "missing_gauge_OUTLET": 70,
+          "unexpected_instrument_count:0g/0l": 70
+        },
+        "verified_correct": 58,
+        "verified_exact": 58,
+        "verified_wrong": 0
+      },
+      "none": {
+        "accepted_non_exact": 0,
+        "agreement_rate": 1.0,
+        "false_accept_rate": 0.0,
+        "n": 100,
+        "normalization_attempts": 0,
+        "rejected": 0,
+        "top_rejection_reasons": {},
+        "verified_correct": 100,
+        "verified_exact": 100,
+        "verified_wrong": 0
+      },
+      "rotate_1deg": {
+        "accepted_non_exact": 0,
+        "agreement_rate": 0.64,
+        "false_accept_rate": 0.0,
+        "n": 100,
+        "normalization_attempts": 100,
+        "rejected": 36,
+        "top_rejection_reasons": {
+          "INLET:numerals_unreadable": 8,
+          "OUTLET:numerals_unreadable": 11,
+          "lamp_caption_unreadable": 7
+        },
+        "verified_correct": 64,
+        "verified_exact": 64,
+        "verified_wrong": 0
+      },
+      "rotate_minus_1deg": {
+        "accepted_non_exact": 0,
+        "agreement_rate": 0.66,
+        "false_accept_rate": 0.0,
+        "n": 100,
+        "normalization_attempts": 94,
+        "rejected": 34,
+        "top_rejection_reasons": {
+          "OUTLET:numerals_unreadable": 10,
+          "lamp_caption_unreadable": 18,
+          "missing_lamp_RUN": 10
+        },
+        "verified_correct": 66,
+        "verified_exact": 66,
+        "verified_wrong": 0
+      }
+    },
+    "recovery_enabled": true,
+    "scenes": 100
+  },
+  "reference": {
+    "axes": {
+      "gaussian_noise_sigma3": {
+        "accepted_non_exact": 0,
+        "agreement_rate": 0.05,
+        "false_accept_rate": 0.0,
+        "n": 100,
+        "normalization_attempts": 0,
+        "rejected": 95,
+        "top_rejection_reasons": {
+          "missing_gauge_INLET": 123,
+          "missing_gauge_OUTLET": 123,
+          "unexpected_instrument_count:0g/0l": 123
+        },
+        "verified_correct": 5,
+        "verified_exact": 5,
+        "verified_wrong": 0
+      },
+      "none": {
+        "accepted_non_exact": 0,
+        "agreement_rate": 1.0,
+        "false_accept_rate": 0.0,
+        "n": 100,
+        "normalization_attempts": 0,
+        "rejected": 0,
+        "top_rejection_reasons": {},
+        "verified_correct": 100,
+        "verified_exact": 100,
+        "verified_wrong": 0
+      },
+      "rotate_1deg": {
+        "accepted_non_exact": 0,
+        "agreement_rate": 0.0,
+        "false_accept_rate": 0.0,
+        "n": 100,
+        "normalization_attempts": 0,
+        "rejected": 100,
+        "top_rejection_reasons": {
+          "INLET:scale_not_found": 150,
+          "OUTLET:scale_not_found": 150,
+          "pump_label_unreadable": 136
+        },
+        "verified_correct": 0,
+        "verified_exact": 0,
+        "verified_wrong": 0
+      },
+      "rotate_minus_1deg": {
+        "accepted_non_exact": 0,
+        "agreement_rate": 0.06,
+        "false_accept_rate": 0.0,
+        "n": 100,
+        "normalization_attempts": 0,
+        "rejected": 94,
+        "top_rejection_reasons": {
+          "lamp_caption_unreadable": 100,
+          "missing_lamp_RUN": 72,
+          "pump_label_unreadable": 118
+        },
+        "verified_correct": 6,
+        "verified_exact": 6,
+        "verified_wrong": 0
+      }
+    },
+    "recovery_enabled": false,
+    "scenes": 100
+  },
+  "sample": {
+    "count": 100,
+    "design": "first unique accepted original scenes in v0.2 private index order",
+    "ordered_image_names_sha256": "78a48e9359ec2ba32f7c767463d8f3e4f797fabb2e145a601a5f8a46d5abba3e"
+  }
+}

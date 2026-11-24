@@ -1,4 +1,6 @@
 import ast
+import hashlib
+import json
 from pathlib import Path
 
 import cv2
@@ -6,6 +8,8 @@ import numpy as np
 import pytest
 from manual_panel import panel, png
 
+from panelproof.cli import main
+from panelproof.perturb import apply
 from panelproof.render import png_bytes, render_scene
 from panelproof.scene import generate_scene, scene_from_dict
 from panelproof.validate import compare_trace_to_scene
@@ -31,6 +35,40 @@ def test_manual_fixture_reads_exact_ticks():
     assert p["gauges"]["INLET"]["reading_milli"] == 200_000
     assert p["gauges"]["OUTLET"]["reading_milli"] == 540_000
     assert p["derived"]["state"] == "NORMAL" and p["run"] and not p["alarm"]
+
+
+@pytest.mark.parametrize("axis", ["gaussian_noise_sigma3", "rotate_1deg", "rotate_minus_1deg"])
+def test_optional_small_distortion_recovery_keeps_exact_visible_ticks(axis):
+    source = cv2.imdecode(np.frombuffer(png(panel()), np.uint8), cv2.IMREAD_COLOR)
+    changed = apply(axis, source, np.random.default_rng(7))
+    data = cv2.imencode(".png", changed)[1].tobytes()
+    assert verify_png(data)["status"] == "rejected"
+    trace = verify_png(data, recover_small_distortions=True)
+    assert trace["status"] == "verified"
+    assert trace["image_sha256"] == hashlib.sha256(data).hexdigest()
+    assert json.loads(json.dumps(trace))["normalization"]["coordinate_frame"] == (
+        "source" if axis == "gaussian_noise_sigma3" else "deskewed"
+    )
+    assert trace["pumps"][0]["gauges"]["INLET"]["reading_milli"] == 200_000
+    assert trace["pumps"][0]["gauges"]["OUTLET"]["reading_milli"] == 540_000
+    assert trace["pumps"][0]["pump_id"] == "A"
+    assert trace["pumps"][0]["run"] and not trace["pumps"][0]["alarm"]
+
+
+def test_optional_recovery_keeps_clean_traces_and_does_not_restore_hidden_label():
+    clean = png(panel())
+    assert verify_png(clean, recover_small_distortions=True) == verify_png(clean)
+    hidden = cv2.imdecode(np.frombuffer(png(panel(captions=("INLET", "XX"))), np.uint8), cv2.IMREAD_COLOR)
+    changed = apply("rotate_1deg", hidden, np.random.default_rng(7))
+    trace = verify_png(cv2.imencode(".png", changed)[1].tobytes(), recover_small_distortions=True)
+    assert trace["normalization"]["coordinate_frame"] == "deskewed"
+    assert trace["status"] == "rejected"
+
+
+def test_perturbation_cli_rejects_misspelled_recovery_flag(tmp_path, capsys):
+    with pytest.raises(SystemExit) as error:
+        main(["perturb", "--dataset", str(tmp_path), "--recover-small-distortion"])
+    assert error.value.code == 2 and "unrecognized perturb arguments" in capsys.readouterr().err
 
 
 def test_wrong_lamp_is_seen():

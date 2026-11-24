@@ -1,0 +1,18 @@
+schema_version: "1.0.0"
+dataset_version: "0.3.0"
+generator_config: configs/generator-expanded.yaml
+repro_seed: "pp-expand-v1"
+pilot_seed: "pp-expand-pilot-v1"
+base_groups: 110
+max_attempts: 160
+dev_fraction: 0.20
+heldout_theme: teal
+near_duplicate_hamming: 2
+variants:
+  nuisance_every: 3
+  preserving_every: 4
+  diagnostic_target: 40
+targets: {R: 100, C: 80, M: 150, X: 100, pairs: 50, diagnostics: 40, total: 500}
+samples: 30
+audit_worksheet_size: 50
+workers: 4

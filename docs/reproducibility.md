@@ -44,6 +44,15 @@ uv run --project python --python 3.11 --locked python -m panelproof.cli audit-da
 
 Use absolute paths appropriate to your platform. The builder without a holdout seed file creates a public reproducibility build. Use the [measured evaluation procedure](../evals/conditions.md#measured-runs-need-a-freeze) before submitting performance claims.
 
+## Build the expanded layout dataset
+
+The expanded generator adds a side-by-side two-pump layout with stacked gauges. The commands below produce and audit the public v0.3 configuration. The prior `configs/benchmark.yaml` remains available for reproducing v0.2.
+
+```sh
+uv run --project python --python 3.11 --locked python -m panelproof.cli build-dataset --config configs/benchmark-expanded.yaml --out data/build/expanded
+uv run --project python --python 3.11 --locked python -m panelproof.cli audit-dataset --dataset data/build/expanded --rebuild-config configs/benchmark-expanded.yaml
+```
+
 ## Prepare an archive
 
 From a Git checkout, create the source ZIP from the intended commit and record the checksum. Keep the [submission checklist](../submission/DELIVERABLE.md) alongside the approved samples, evidence, and presentation.
