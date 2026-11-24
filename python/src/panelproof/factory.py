@@ -10,15 +10,25 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import random
+from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
 from .demo_adapter import mock_attempts_for_rows
 from .export import VARIANT_TO_CONTRACT, contract_evidence
 from .mutations import make_nuisance, make_semantic_flip
-from .question_bridge import answer_from_trace, answers_agree, build_questions, response_schema
+from .question_bridge import (
+    answer_from_trace,
+    answers_agree,
+    build_questions,
+    contract_scene,
+    response_schema,
+)
 from .render import evidence_annotations, png_bytes, render_scene
+from .rules import PUMP_RULE
+from .rust_bridge import verify_scenes
 from .scene import Scene, generate_scene, load_config
 from .schemas import SCHEMA_VERSION, PrivateTask, PublicTask
 from .validate import compare_trace_to_scene
@@ -50,7 +60,9 @@ def _verified(scene: Scene) -> tuple[bytes, dict[str, Any]] | None:
 
 def _jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
     path.write_text(
-        "".join(json.dumps(r, sort_keys=True, separators=(",", ":")) + "\n" for r in rows), encoding="utf-8"
+        "".join(json.dumps(r, sort_keys=True, separators=(",", ":")) + "\n" for r in rows),
+        encoding="utf-8",
+        newline="\n",
     )
 
 
@@ -67,9 +79,11 @@ def run_factory(seed: str, count: int, out: Path, difficulty: str = "medium") ->
     contract: list[dict[str, Any]] = []
     keys: list[dict[str, Any]] = []
     traces: dict[str, dict[str, Any]] = {}
+    scenes = {}
     pairs: list[dict[str, Any]] = []
     rows: list[dict[str, Any]] = []
     skipped = 0
+    rust_pp = os.environ.get("PANELPROOF_RUST_PP")
 
     def emit(
         scene: Scene, png: bytes, trace: dict[str, Any], pump_id: str, kind: str, vk: str, pair: str | None
@@ -127,18 +141,24 @@ def run_factory(seed: str, count: int, out: Path, difficulty: str = "medium") ->
                 "pair_id": pair,
                 "scene_id": scene.scene_id,
                 "evidence": [e for e in evidence_annotations(scene) if e["pump"] == pump_id],
+                "generator_readings": {
+                    gauge.role: {"unit": gauge.unit, "value_milli": gauge.value_milli}
+                    for gauge in scene.pump(pump_id).gauges
+                },
                 "validation": {
                     "verifier_version": trace["verifier_version"],
                     "verdict": tp["verdict"],
                     "derived": tp["derived"],
                     "readings": {
-                        r: {k: g[k] for k in ("unit", "reading_milli", "uncertainty_mkpa")}
+                        r: {k: g[k] for k in ("unit", "reading_milli", "uncertainty_mkpa", "center", "radius")}
                         for r, g in tp["gauges"].items()
                     },
                 },
             }
         )
         traces[scene.scene_id] = trace
+        if rust_pp:
+            scenes[scene.scene_id] = contract_scene(scene)
         rows.append({**keys[-1]})
         return tid
 
@@ -179,6 +199,20 @@ def run_factory(seed: str, count: int, out: Path, difficulty: str = "medium") ->
             break
         if not done:
             raise RuntimeError(f"could not build a verified group for index {i}")
+    if rust_pp:
+        rust_rows = verify_scenes(
+            (scene.model_dump(mode="json") for scene in scenes.values()),
+            executable=rust_pp,
+            required=True,
+        )
+        assert rust_rows is not None
+        agreement = {
+            (scene.base_scene_id, pump.id): {"id": pump.id, **asdict(PUMP_RULE.solve(pump))} == actual
+            for scene, rust in zip(scenes.values(), rust_rows, strict=True)
+            for pump, actual in zip(scene.equipment, rust["equipment"], strict=True)
+        }
+        for key in keys:
+            key["validation"]["rust_rule_agrees"] = agreement[(key["scene_id"], key["pump_id"])]
     (out / "public").mkdir()
     (out / "private").mkdir()
     # Shared-contract bundle (imported by the Axum API) plus web-demo extras.
@@ -192,5 +226,7 @@ def run_factory(seed: str, count: int, out: Path, difficulty: str = "medium") ->
         str(p.relative_to(out)).replace("\\", "/"): _sha(p.read_bytes()) for p in sorted(out.rglob("*")) if p.is_file()
     }
     manifest = {"schema_version": "1.0.0", "seed": seed, "count": count, "difficulty": difficulty, "files": files}
-    (out / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    (out / "manifest.json").write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="\n"
+    )
     return {"tasks": len(tasks), "pairs": len(pairs), "skipped_candidates": skipped, "out": str(out)}

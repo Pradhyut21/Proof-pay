@@ -19,10 +19,11 @@ interface Props {
   label: string;
   job?: string;
   evidence?: EvidenceRegion[] | null;
+  recoveredEvidence?: EvidenceRegion[] | null;
 }
 
 /** Panel image with zoom. Evidence boxes are drawn only when the backend has revealed them. */
-export function PanelViewer({ set, task, label, evidence, job }: Props) {
+export function PanelViewer({ set, task, label, evidence, recoveredEvidence, job }: Props) {
   const [zoom, setZoom] = useState(1);
   const idx = ZOOMS.indexOf(zoom);
   return (
@@ -68,20 +69,27 @@ export function PanelViewer({ set, task, label, evidence, job }: Props) {
             height={IMAGE_HEIGHT}
             className="block h-auto w-full"
           />
-          {evidence?.map((e) => (
-            <div
-              key={e.instrument_id}
-              data-testid="evidence-box"
-              title={e.instrument_id}
-              className="pointer-events-none absolute border-2 border-dashed border-primary"
-              style={{
-                left: `${(e.x / IMAGE_WIDTH) * 100}%`,
-                top: `${(e.y / IMAGE_HEIGHT) * 100}%`,
-                width: `${(e.width / IMAGE_WIDTH) * 100}%`,
-                height: `${(e.height / IMAGE_HEIGHT) * 100}%`,
-              }}
-            />
-          ))}
+          {(
+            [
+              ["evidence-box", "border-dashed border-primary", evidence],
+              ["raster-evidence-box", "border-success", recoveredEvidence],
+            ] as const
+          ).flatMap(([testId, style, regions]) =>
+            (regions ?? []).map((e) => (
+              <div
+                key={testId + e.instrument_id}
+                data-testid={testId}
+                title={e.instrument_id}
+                className={"pointer-events-none absolute border-2 " + style}
+                style={{
+                  left: `${(e.x / IMAGE_WIDTH) * 100}%`,
+                  top: `${(e.y / IMAGE_HEIGHT) * 100}%`,
+                  width: `${(e.width / IMAGE_WIDTH) * 100}%`,
+                  height: `${(e.height / IMAGE_HEIGHT) * 100}%`,
+                }}
+              />
+            )),
+          )}
         </div>
       </div>
     </figure>

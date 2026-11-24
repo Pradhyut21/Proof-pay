@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { PanelViewer } from "@/components/PanelViewer";
 import { QuestionForm } from "@/components/QuestionForm";
@@ -154,6 +155,17 @@ export default function FactoryPage() {
           <Card key={t.task_id} className="space-y-4">
             <PanelViewer set="factory" task={t} label={`Panel ${i + 1}`} job={job?.job_id} />
             <QuestionForm set="factory" task={t} job={job?.job_id} />
+            {job?.status === "succeeded" && (
+              <Link
+                href={{
+                  pathname: "/inspector",
+                  query: { set: "factory", job: job.job_id, task: t.task_id },
+                }}
+                className="inline-flex min-h-11 items-center font-semibold text-primary underline"
+              >
+                Inspect evidence
+              </Link>
+            )}
           </Card>
         ))}
       </div>

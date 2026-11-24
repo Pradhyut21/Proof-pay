@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ModelAttempts } from "@/components/ModelAttempts";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -23,6 +23,7 @@ export default function ArenaPage() {
   const [sides, setSides] = useState<Side[]>([]);
   const [offline, setOffline] = useState(false);
   const [message, setMessage] = useState<string>();
+  const revealRequest = useRef(0);
 
   useEffect(() => {
     api
@@ -38,8 +39,6 @@ export default function ArenaPage() {
     const pair = pairs.find((p) => p.pair_id === pairId);
     if (!pair) return;
     let cancelled = false;
-    setSides([]);
-    setMessage(undefined);
     Promise.all(
       pair.task_ids.map(async (id, i) => {
         const [task, ma] = await Promise.all([
@@ -60,11 +59,24 @@ export default function ArenaPage() {
     };
   }, [pairId, pairs]);
 
+  function selectPair(id: string) {
+    if (id === pairId) return;
+    revealRequest.current += 1;
+    setSides([]);
+    setMessage(undefined);
+    setPairId(id);
+  }
+
   async function reveal() {
+    const request = ++revealRequest.current;
+    setMessage(undefined);
     try {
       const revealed = await Promise.all(sides.map((s) => api.reveal("demo", s.task.task_id)));
-      setSides((prev) => prev.map((s, i) => ({ ...s, reveal: revealed[i] })));
+      if (request !== revealRequest.current) return;
+      const byTask = new Map(revealed.map((answer) => [answer.task_id, answer]));
+      setSides((prev) => prev.map((side) => ({ ...side, reveal: byTask.get(side.task.task_id) })));
     } catch (e) {
+      if (request !== revealRequest.current) return;
       setMessage(
         e instanceof ApiError && e.kind === "http"
           ? `Reveal refused by the API (${e.status}).`
@@ -91,7 +103,7 @@ export default function ArenaPage() {
             <select
               id="pair"
               value={pairId}
-              onChange={(e) => setPairId(e.target.value)}
+              onChange={(e) => selectPair(e.target.value)}
               className="block min-h-11 rounded-md border border-border bg-background px-3"
             >
               {pairs.map((p) => (
