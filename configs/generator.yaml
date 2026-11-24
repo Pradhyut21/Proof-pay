@@ -1,0 +1,16 @@
+schema_version: "1.0.0"
+generator_version: "0.1.0"
+canvas: {width: 1280, height: 960}
+# 1-2 pump layouts are verifier-supported (2-4 gauges, 2-4 lamps). 3 pumps is generator-only.
+pumps: {min: 1, max: 2}
+themes: [daylight, slate, sand, teal]
+# Scales per unit: [min, max, major_step, minor_per_major] in display units.
+scales:
+  kPa: [[0, 600, 100, 5], [0, 800, 200, 5], [0, 900, 150, 5]]
+  bar: [[0, 6, 1, 5], [0, 8, 2, 5], [0, 10, 2, 5]]
+  psi: [[0, 100, 20, 5], [0, 120, 20, 5], [0, 200, 50, 5]]
+unit_weights: {kPa: 0.5, bar: 0.3, psi: 0.2}
+run_probability: 0.8
+alarm_probability: 0.5   # independent of the derived state, so ALARM is a decorrelated cue
+# Reading uncertainty (in minor ticks) used for the answer-margin check.
+reading_uncertainty_ticks: 1
