@@ -158,6 +158,11 @@ def response_schema(q: Question, diagnostic: bool = False) -> dict[str, Any]:
     return q.schema
 
 
+def answer_value(answer: dict[str, Any]) -> dict[str, Any]:
+    """Return the reference value without its grading tolerance."""
+    return {key: value for key, value in answer.items() if key != "tolerance_milli"}
+
+
 def score_answer(answer: dict[str, Any], response: dict[str, Any] | None) -> str:
     """Deterministic python reference scoring: correct | incorrect | invalid."""
     if not response or response.get("kind") != answer["kind"]:

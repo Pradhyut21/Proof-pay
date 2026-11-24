@@ -15,7 +15,7 @@ Requirements: Rust stable, Python 3.11+ with [uv](https://docs.astral.sh/uv/), N
 ./run.sh web             # terminal 2: web app on http://127.0.0.1:3000
 ```
 
-Open `/factory` to build a small dataset and `/arena` to answer tasks and reveal answers. The reveal token is read from `PANELPROOF_REVEAL_TOKEN` (the scripts default to a local development value) and stays on the server.
+Open `/factory` to build a small dataset and `/arena` to answer tasks and reveal answers. The reveal token stays on the server. The scripts use a local development default. Set a fresh random `PANELPROOF_REVEAL_TOKEN` in the deployment environment before exposing a demo beyond loopback.
 
 | Command | What it does |
 | --- | --- |
@@ -25,7 +25,13 @@ Open `/factory` to build a small dataset and `/arena` to answer tasks and reveal
 | `./run.sh reproduce` | Rebuild, audit and write a DEMO ONLY report |
 | `./run.sh e2e` | Playwright judge-flow test |
 
-On Windows use `.\run.ps1` with the same command names. The Rust workspace did not build with the GNU toolchain on the Windows machine used here (missing MinGW tools); there, Rust was built and tested in WSL Ubuntu. The MSVC toolchain is the expected native route and was not tested. On low-memory machines set `workers: 1` in `configs/benchmark.yaml` (the default is 4; a one-worker build was not compared against the four-worker manifest). Docker files exist (`compose.yaml`, `infra/docker/`) but were **not run**.
+On Windows use `.\run.ps1` with the same commands. The native Windows MSVC Rust workspace passed its tests. On low-memory machines set `workers: 1` in `configs/benchmark.yaml`. The [platform workflow](.github/workflows/platform-checks.yml) records Compose build and startup evidence and macOS core tests.
+
+If you extracted the source-only release ZIP, generate local development panels after bootstrap and before starting the API or Compose.
+
+```sh
+uv run --project python --python 3.11 --locked python -m panelproof.cli factory --seed source-demo --count 3 --out data/demo
+```
 
 ## Checks
 
@@ -49,6 +55,7 @@ If Cargo uses a custom target directory, pass the built `pp` binary path to the 
 | Task definitions | [`docs/task_card.md`](docs/task_card.md) |
 | Dataset contents, splits and limits | [`docs/dataset_card.md`](docs/dataset_card.md) |
 | Validation results, perturbation table, parity | [`docs/validation.md`](docs/validation.md) |
+| Blinded review and agreement | [`docs/human_audit.md`](docs/human_audit.md) |
 | Evaluation protocol, conditions and metrics | [`evals/protocol.md`](evals/protocol.md), [`evals/conditions.md`](evals/conditions.md), [`evals/runner.md`](evals/runner.md) |
 | API | [`docs/api.md`](docs/api.md) |
 | Source and license audit | [`docs/source_audit.md`](docs/source_audit.md), [`docs/dataset_sources.md`](docs/dataset_sources.md) |

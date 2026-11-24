@@ -23,8 +23,19 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
 
-from .question_bridge import score_answer
+from pydantic import ValidationError
+
+from .adapters import PublicInput
+from .evaluate import (
+    C3Observations,
+    EvalLimits,
+    input_selection_sha256,
+    prepare_c3_observations,
+    public_input_sha256,
+)
+from .question_bridge import answer_value, score_answer
 from .scene import canonical_json
+from .schemas import PublicTask
 
 CORE_CONDITIONS = ("C0", "C1", "C3")
 FROZEN_SPLITS = ("frozen_main", "frozen_heldout_style")
@@ -76,12 +87,68 @@ def require_freeze(manifest: dict[str, Any] | None, approval: dict[str, Any] | N
         raise PermissionError("measured report requires recorded approval for this holdout and selection")
 
 
+def _holdout_inputs(
+    root: Path, manifest: dict[str, Any], selected: set[str]
+) -> tuple[C3Observations, dict[str, str]]:
+    public_files = manifest.get("public_files")
+    if not isinstance(public_files, dict):
+        raise PermissionError("measured report requires public holdout checksums")
+    relative = "public/frozen.jsonl"
+    public_path = root / relative
+    try:
+        public_bytes = public_path.read_bytes()
+    except OSError as exc:
+        raise PermissionError("measured report requires the committed public frozen task list") from exc
+    if hashlib.sha256(public_bytes).hexdigest() != public_files.get(relative):
+        raise PermissionError("public frozen task list does not match the holdout manifest")
+    try:
+        tasks = [PublicTask.model_validate_json(line) for line in public_bytes.splitlines() if line.strip()]
+    except ValidationError:
+        raise PermissionError("public frozen task list contains an invalid task") from None
+    cohort = [task for task in tasks if task.task_id in selected]
+    if len(cohort) != len(selected) or {task.task_id for task in cohort} != selected:
+        raise PermissionError("approved tasks must appear exactly once in the public frozen task list")
+
+    limits = EvalLimits()
+    root = root.resolve()
+    for rel_image in sorted({task.image_path for task in cohort}):
+        path = (root / rel_image).resolve()
+        if not path.is_relative_to(root):
+            raise PermissionError("approved PNG is outside the holdout root")
+        try:
+            with path.open("rb") as stream:
+                image = stream.read(limits.max_image_bytes + 1)
+        except OSError as exc:
+            raise PermissionError("measured report requires all approved holdout PNGs") from exc
+        if len(image) > limits.max_image_bytes or hashlib.sha256(image).hexdigest() != public_files.get(rel_image):
+            raise PermissionError("approved PNG does not match the holdout manifest")
+    try:
+        observations = prepare_c3_observations(cohort, root, limits)
+    except ValueError as exc:
+        raise PermissionError(f"could not independently recover approved C3 observations: {exc}") from None
+    digests = {
+        condition: input_selection_sha256({
+            task.task_id: public_input_sha256(
+                PublicInput(
+                    task.question, task.public_rules, task.response_schema,
+                    visible_readings=observations.readings_by_task[task.task_id] if condition == "C3" else None,
+                ),
+                public_files[task.image_path] if condition == "C1" else None,
+            )
+            for task in cohort
+        })
+        for condition in CORE_CONDITIONS
+    }
+    return observations, digests
+
+
 def _measured_provenance(
     tasks: dict[str, dict[str, Any]],
     attempts: list[dict[str, Any]],
     manifest: dict[str, Any],
     approval: dict[str, Any] | None,
     split: str,
+    root: Path,
 ) -> dict[str, Any]:
     if not attempts:
         raise PermissionError("measured report requires nonempty model attempts")
@@ -112,14 +179,39 @@ def _measured_provenance(
         or any(model not in approved_models for model in identities)
     ):
         raise PermissionError("measured report requires approval for the exact provider, model and revision set")
+    selected: set[str] = set()
     for by_condition in by_model.values():
-        first = next(iter(by_condition.values()))
+        if set(by_condition) != set(CORE_CONDITIONS):
+            raise PermissionError("measured report requires exact C0, C1 and C3 runs for every model")
+        first = by_condition["C0"]
         if not first or any(ids != first for ids in by_condition.values()):
             raise PermissionError("measured report requires the same nonempty task selection for every condition")
-        require_freeze(manifest, approval, selection_hash(list(first), list(by_condition)))
+        require_freeze(manifest, approval, selection_hash(list(first), list(CORE_CONDITIONS)))
+        selected = first
+    observations, approved_inputs = _holdout_inputs(root, manifest, selected)
+    input_runs: dict[tuple[str, str, str], set[str]] = defaultdict(set)
+    c3_runs: dict[tuple[str, str], set[str]] = defaultdict(set)
+    for attempt in attempts:
+        condition = attempt["condition"]
+        run_key = (attempt["run_id"], condition, attempt["public_inputs_sha256"])
+        input_runs[run_key].add(attempt["task_id"])
+        if condition == "C3":
+            key = (attempt["run_id"], attempt["c3_observations_sha256"])
+            c3_runs[key].add(attempt["task_id"])
+    if len(c3_runs) != len({run_id for run_id, _ in c3_runs}):
+        raise PermissionError("C3 run ID is bound to conflicting observation digests")
+    for (_, digest), ids in c3_runs.items():
+        readings = {tid: observations.readings_by_task[tid] for tid in ids}
+        if digest != C3Observations(readings, 0).digest:
+            raise PermissionError("C3 run observations do not match the independently recovered holdout readings")
+    for (_, condition, digest), ids in input_runs.items():
+        if ids != selected or digest != approved_inputs[condition]:
+            raise PermissionError(f"{condition} run inputs do not match the approved holdout cohort")
     return {
         "dataset_manifest_sha256": manifest["manifest_sha256"],
         "selection_hash": approval["selection_hash"],
+        "c3_observations_sha256": observations.digest,
+        "public_inputs_sha256": approved_inputs,
         "models": [
             {**identity, "run_ids": sorted(run_ids[key])} for identity, key in zip(identities, sorted(by_model), strict=True)
         ],
@@ -175,7 +267,7 @@ def pair_metrics(rows: list[dict[str, Any]]) -> dict[str, Any]:
             n += 1
             both_correct += base["outcome"] == "correct" and var["outcome"] == "correct"
             if base["outcome"] in ("correct", "incorrect") and var["outcome"] in ("correct", "incorrect"):
-                same_ref = base["answer"] == var["answer"]
+                same_ref = answer_value(base["answer"]) == answer_value(var["answer"])
                 changed = base["response"] != var["response"]
                 if same_ref:
                     n_inv += 1
@@ -388,6 +480,7 @@ def render_markdown(rep: dict[str, Any]) -> str:
         L += [
             f"Holdout manifest SHA-256 `{provenance['dataset_manifest_sha256']}`",
             f"Selection SHA-256 `{provenance['selection_hash']}`",
+            f"Verified C3 observation SHA-256 `{provenance['c3_observations_sha256']}`",
             "",
         ]
         for model in provenance["models"]:
@@ -505,7 +598,7 @@ def main_metrics(argv: list[str]) -> int:
         attempts = [row for path in a.attempts for row in load_contract_attempts(Path(path), measured=a.measured)]
     else:
         attempts = [row for path in a.attempts for row in load_attempts(Path(path))]
-    provenance = _measured_provenance(tasks, attempts, manifest, approval, a.split) if a.measured else None
+    provenance = _measured_provenance(tasks, attempts, manifest, approval, a.split, root) if a.measured else None
     rep = build_report(tasks, attempts, split=a.split)
     if provenance:
         rep["banner"] = "MEASURED"

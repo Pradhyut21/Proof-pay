@@ -93,7 +93,12 @@ def test_payload_and_resume_cache_are_content_based(tmp_path):
     assert run.demo_only and calls == 1 and attempts[0].status == "unscored"
     payload = original.payloads[0]
     assert payload.image_png == png()
-    assert set(vars(payload)) == {"question", "public_rules", "response_schema", "image_png"}
+    assert payload.visible_readings is None
+    assert set(json.loads(payload.prompt().split("\n", 1)[1])) == {
+        "question",
+        "public_rules",
+        "response_schema",
+    }
     assert task.task_id not in payload.prompt() and task.image_path not in payload.prompt()
 
     no_calls = StubAdapter()
@@ -168,6 +173,116 @@ def test_oversized_and_metadata_bearing_images_skip_provider(tmp_path):
         tmp_path, [task], adapter, condition="C1", limits=EvalLimits(max_image_bytes=40)
     )
     assert calls == 0 and attempts[0].error == "image_too_large"
+
+
+def c3_trace(inlet=150_000):
+    return {
+        "status": "verified",
+        "scene_id": "private-scene-id",
+        "image_sha256": "private-image-hash",
+        "pumps": [
+            {
+                "verdict": "verified",
+                "label": "PUMP P-12",
+                "pump_id": "private-pump-id",
+                "gauges": {
+                    "INLET": {
+                        "unit": "kPa",
+                        "reading_milli": inlet,
+                        "private_hidden": "trace-marker",
+                    },
+                    "OUTLET": {"unit": "bar", "reading_milli": 5_500, "reading_mkpa": 550_000},
+                },
+                "lamps": {"RUN": {"state": "on"}, "ALARM": {"state": "off"}},
+                "derived": {"state": "private-reference-answer", "expected_alarm": False},
+            }
+        ],
+    }
+
+
+def test_c3_provider_gets_visible_readings_only_and_cache_tracks_readings(tmp_path, monkeypatch):
+    from panelproof import verify
+
+    image_dir = tmp_path / "images"
+    image_dir.mkdir()
+    task = public_task("private-task-id")
+    image_path = tmp_path / task.image_path
+    image_path.write_bytes(png())
+    monkeypatch.setattr(
+        verify, "verify_png", lambda image: c3_trace(150_000 if image == png() else 160_000)
+    )
+    sent = []
+
+    def transport(_url, _headers, body, _timeout):
+        sent.append(body["messages"][0]["content"])
+        return {"choices": [{"message": {"content": ANSWER}}]}
+
+    monkeypatch.setattr(adapters, "_post_json", transport)
+    adapter = ApiAdapter(
+        "openai_compatible", "fixture-model", "v1", "https://provider.example/v1/test", "key"
+    )
+    limits = EvalLimits(max_cost_micros=20, call_cost_ceiling_micros=20)
+    first, attempts, calls = run_eval(tmp_path, [task], adapter, condition="C3", limits=limits)
+    assert calls == 1 and attempts[0].status == "unscored"
+    assert len(sent[0]) == 1 and sent[0][0]["type"] == "text"
+    text = sent[0][0]["text"]
+    assert not any(
+        term in text for term in ("private-", "trace-marker", "reading_mkpa", "expected_alarm")
+    )
+    assert json.loads(text.split("\n", 1)[1])["visible_readings"] == [
+        {
+            "label": "PUMP P-12",
+            "gauges": {
+                "INLET": {"unit": "kPa", "value_milli": 150_000},
+                "OUTLET": {"unit": "bar", "value_milli": 5_500},
+            },
+            "lamps": {"RUN": "on", "ALARM": "off"},
+        }
+    ]
+    repeat, cached, calls = run_eval(tmp_path, [task], adapter, condition="C3", limits=limits)
+    assert not calls and cached[0].cached and len(sent) == 1
+    assert first.sampling_parameters["public_inputs_sha256"] == repeat.sampling_parameters["public_inputs_sha256"]
+    image_path.write_bytes(png(red=12))
+    changed, _, calls = run_eval(tmp_path, [task], adapter, condition="C3", limits=limits)
+    assert calls == 1 and len(sent) == 2
+    assert (
+        first.sampling_parameters["c3_observations_sha256"]
+        != changed.sampling_parameters["c3_observations_sha256"]
+    )
+    assert first.sampling_parameters["public_inputs_sha256"] != changed.sampling_parameters["public_inputs_sha256"]
+
+
+def test_c3_unverified_task_blocks_entire_cohort_and_dry_run_uses_preflight(
+    tmp_path, monkeypatch, capsys
+):
+    from panelproof import verify
+
+    images = tmp_path / "images"
+    images.mkdir()
+    first, second = public_task("t1"), public_task("t2")
+    (tmp_path / first.image_path).write_bytes(png())
+    (tmp_path / second.image_path).write_bytes(png(red=1))
+    monkeypatch.setattr(
+        verify, "verify_png", lambda image: c3_trace() if image == png() else {"status": "rejected"}
+    )
+    stub = StubAdapter()
+    with pytest.raises(ValueError, match="C3 preflight failed for task t2"):
+        run_eval(tmp_path, [first, second], stub, condition="C3")
+    assert stub.payloads == [] and not (tmp_path / "cache.sqlite3").exists()
+
+    tasks = tmp_path / "tasks.jsonl"
+    tasks.write_text(first.model_dump_json() + "\n", encoding="utf-8")
+    args = ["--tasks", str(tasks), "--asset-root", str(tmp_path), "--condition", "C3", "--dry-run"]
+    assert main(args) == 0
+    plan = json.loads(capsys.readouterr().out)
+    assert plan["selected"] == plan["c3_verified_images"] == 1
+    assert len(plan["c3_observations_sha256"]) == 64
+
+    tasks.write_text(
+        first.model_dump_json() + "\n" + second.model_dump_json() + "\n", encoding="utf-8"
+    )
+    assert main(args) == 2
+    assert "C3 preflight failed for task t2" in capsys.readouterr().err
 
 
 @pytest.mark.parametrize("provider", ["openai_compatible", "anthropic"])

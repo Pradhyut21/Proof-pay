@@ -5,7 +5,7 @@ from __future__ import annotations
 import base64
 import json
 from dataclasses import dataclass, field
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol, TypedDict
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
@@ -15,24 +15,43 @@ ANTHROPIC_API_VERSION = "2026-10-21"
 MAX_RESPONSE_BYTES = 1_048_576
 
 
+class VisibleReading(TypedDict):
+    value_milli: int
+    unit: str
+
+
+class VisiblePump(TypedDict):
+    label: str
+    gauges: dict[str, VisibleReading]
+    lamps: dict[str, Literal["on", "off"]]
+
+
 @dataclass(frozen=True)
 class PublicInput:
     question: str
     public_rules: str
     response_schema: dict[str, Any]
     image_png: bytes | None = None
+    visible_readings: tuple[VisiblePump, ...] | None = None
 
     def prompt(self) -> str:
+        public_fields: dict[str, Any] = {
+            "question": self.question,
+            "public_rules": self.public_rules,
+            "response_schema": self.response_schema,
+        }
+        note = ""
+        if self.visible_readings is not None:
+            public_fields["visible_readings"] = self.visible_readings
+            note = " Each gauge value_milli is in thousandths of its displayed unit."
         body = json.dumps(
-            {
-                "question": self.question,
-                "public_rules": self.public_rules,
-                "response_schema": self.response_schema,
-            },
+            public_fields,
             ensure_ascii=False,
             sort_keys=True,
         )
-        return f"Answer the task with a single JSON object matching its response_schema.\n{body}"
+        return (
+            f"Answer the task with a single JSON object matching its response_schema.{note}\n{body}"
+        )
 
 
 @dataclass(frozen=True)

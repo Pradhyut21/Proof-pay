@@ -23,6 +23,8 @@ The tool resolves the revision to an exact commit and reads the matching Git blo
 
 The source allowlist covers code, scripts, project configuration, and documentation. Prepare approved samples, validation logs, measured outputs, the demo, and the judge key as separate artifacts. Inspect the ZIP contents and confirm the SHA-256 before handing it off.
 
+For an extracted source ZIP, bootstrap the dependencies and generate a local development bundle before starting the API or Compose. [Source-only quickstart](../README.md#quickstart)
+
 ## Verify the registered portal
 
 - [ ] Confirm the registered roster and team eligibility. The public event lists 3–4 people per registered team.

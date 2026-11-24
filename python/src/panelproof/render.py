@@ -4,7 +4,7 @@ Public visual conventions (also what the raster verifier relies on, without impo
   * dial sweep: first tick at 225 deg (lower-left), last tick at -45 deg, clockwise, 270 deg total
   * tick marks at 0.74-0.90 R, numerals at 0.52 R for each major tick, unit text below the hub
   * needle is a single bar from the hub to 0.72 R, no tail; RUN/ALARM lamps are filled discs with captions
-  * all text uses the Pillow default font (Aileron, CC0) with 2 px tracking
+  * all text uses Pillow's bundled Aileron Regular with 2 px tracking
 """
 
 from __future__ import annotations

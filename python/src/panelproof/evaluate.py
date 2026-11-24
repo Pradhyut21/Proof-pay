@@ -36,10 +36,12 @@ from panelproof.adapters import (
     DemoAdapter,
     ProviderError,
     PublicInput,
+    VisiblePump,
 )
 from panelproof.schemas import SCHEMA_VERSION, Answer, Attempt, PublicTask, Run
 
-Condition = Literal["C0", "C1"]
+Condition = Literal["C0", "C1", "C3"]
+CONDITIONS = ("C0", "C1", "C3")
 _ANSWER = TypeAdapter(Answer)
 _PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
 _IMAGE_CHUNKS = {b"IHDR", b"PLTE", b"IDAT", b"IEND", b"tRNS"}
@@ -53,6 +55,15 @@ def _canonical(value: Any) -> bytes:
 
 def _digest(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
+
+
+def public_input_sha256(payload: PublicInput, image_sha256: str | None) -> str:
+    """Commit to the exact prompt and, when sent, the PNG bytes."""
+    return _digest(_canonical({"prompt": payload.prompt(), "image_sha256": image_sha256}))
+
+
+def input_selection_sha256(inputs_by_task: dict[str, str]) -> str:
+    return _digest(_canonical(inputs_by_task))
 
 
 def _reject_constant(value: str) -> None:
@@ -182,6 +193,64 @@ def _read_tasks(path: Path) -> list[PublicTask]:
     return tasks
 
 
+@dataclass(frozen=True)
+class C3Observations:
+    readings_by_task: dict[str, tuple[VisiblePump, ...]]
+    verified_images: int
+
+    @property
+    def digest(self) -> str:
+        return _digest(_canonical(self.readings_by_task))
+
+
+def _visible_readings(trace: dict[str, Any]) -> tuple[VisiblePump, ...]:
+    if trace.get("status") != "verified" or not trace.get("pumps"):
+        raise ValueError("panel readings are not verified")
+    visible: list[VisiblePump] = []
+    try:
+        for pump in trace["pumps"]:
+            label = pump["label"]
+            if pump["verdict"] != "verified" or not isinstance(label, str) or not label.strip():
+                raise ValueError("equipment label or readings are not verified")
+            gauges = {}
+            for role in ("INLET", "OUTLET"):
+                unit = pump["gauges"][role]["unit"]
+                value = pump["gauges"][role]["reading_milli"]
+                if unit not in {"kPa", "bar", "psi"} or type(value) is not int:
+                    raise ValueError("gauge reading or unit is not verified")
+                gauges[role] = {"unit": unit, "value_milli": value}
+            lamps = {role: pump["lamps"][role]["state"] for role in ("RUN", "ALARM")}
+            if any(state not in {"on", "off"} for state in lamps.values()):
+                raise ValueError("indicator state is not verified")
+            visible.append({"label": label, "gauges": gauges, "lamps": lamps})
+    except (KeyError, TypeError) as exc:
+        raise ValueError("required visible observations are missing") from exc
+    if len({pump["label"] for pump in visible}) != len(visible):
+        raise ValueError("equipment labels are ambiguous")
+    return tuple(sorted(visible, key=lambda pump: pump["label"]))
+
+
+def prepare_c3_observations(
+    tasks: list[PublicTask], asset_root: Path, limits: EvalLimits
+) -> C3Observations:
+    """Recover only visible readings from public PNGs, covering the entire cohort first."""
+    from panelproof.verify import verify_png
+
+    if not tasks or len({task.task_id for task in tasks}) != len(tasks):
+        raise ValueError("C3 preflight requires a nonempty selection with unique task IDs.")
+    readings_by_path: dict[str, tuple[VisiblePump, ...]] = {}
+    readings_by_task = {}
+    for task in tasks:
+        try:
+            if task.image_path not in readings_by_path:
+                trace = verify_png(_prepare_png(task, asset_root, limits))
+                readings_by_path[task.image_path] = _visible_readings(trace)
+            readings_by_task[task.task_id] = readings_by_path[task.image_path]
+        except ValueError as exc:
+            raise ValueError(f"C3 preflight failed for task {task.task_id}: {exc}") from None
+    return C3Observations(readings_by_task, len(readings_by_path))
+
+
 def _selection(tasks: list[PublicTask], *, seed: int, limit: int) -> list[PublicTask]:
     return sorted(tasks, key=lambda task: _digest(_canonical([seed, task.task_id])))[:limit]
 
@@ -247,6 +316,8 @@ def _attempt(
     budget: _Budget,
     asset_root: Path,
     db: sqlite3.Connection,
+    visible_readings: tuple[VisiblePump, ...] | None,
+    inputs_by_task: dict[str, str],
 ) -> Attempt:
     start = time.monotonic()
     base = {
@@ -281,7 +352,12 @@ def _attempt(
         image = _prepare_png(task, asset_root, limits) if run.condition == "C1" else None
     except ValueError as exc:
         return record("skipped", error=str(exc))
-    payload = PublicInput(task.question, task.public_rules, task.response_schema, image)
+    payload = PublicInput(
+        task.question, task.public_rules, task.response_schema, image, visible_readings
+    )
+    inputs_by_task[task.task_id] = public_input_sha256(
+        payload, _digest(image) if image is not None else None
+    )
     key = (
         _cache_key(adapter, payload, run.condition, limits.max_tokens) if adapter.revision else None
     )
@@ -330,8 +406,8 @@ def evaluate(
     cache_path: Path,
 ) -> tuple[Run, list[Attempt], int]:
     """Return one run and one outcome per selected task, with actual invocation count."""
-    if condition not in {"C0", "C1"}:
-        raise ValueError("Only C0 and C1 are supported by this runner.")
+    if condition not in CONDITIONS:
+        raise ValueError("Only C0, C1 and C3 are supported by this runner.")
     if len({task.task_id for task in tasks}) != len(tasks):
         raise ValueError("Each selected task ID must be unique within the run.")
     if (
@@ -341,6 +417,10 @@ def evaluate(
         raise ValueError(
             "Live evaluation requires a positive cost cap and per-request cost ceiling."
         )
+    observations = prepare_c3_observations(tasks, asset_root, limits) if condition == "C3" else None
+    sampling = {"max_tokens": limits.max_tokens, "max_retries": limits.max_retries}
+    if observations is not None:
+        sampling["c3_observations_sha256"] = observations.digest
     run = Run(
         schema_version=SCHEMA_VERSION,
         run_id=f"run-{uuid.uuid4().hex}",
@@ -354,17 +434,32 @@ def evaluate(
         environment_fingerprint=f"{platform.system()}-{platform.machine()}-py{platform.python_version()}",
         demo_only=adapter.provider == "demo",
         model_revision=adapter.revision,
-        sampling_parameters={"max_tokens": limits.max_tokens, "max_retries": limits.max_retries},
+        sampling_parameters=sampling,
         max_cost_usd=limits.max_cost_micros / _MICROS_PER_DOLLAR,
     )
     cache_path.parent.mkdir(parents=True, exist_ok=True)
     budget = _Budget(limits)
+    inputs_by_task: dict[str, str] = {}
     with closing(sqlite3.connect(cache_path, timeout=30)) as db:
         with db:
             db.execute(
                 "CREATE TABLE IF NOT EXISTS cached_answer (cache_key TEXT PRIMARY KEY, reply BLOB NOT NULL)"
             )
-        attempts = [_attempt(task, run, adapter, budget, asset_root, db) for task in tasks]
+        attempts = [
+            _attempt(
+                task,
+                run,
+                adapter,
+                budget,
+                asset_root,
+                db,
+                observations.readings_by_task[task.task_id] if observations is not None else None,
+                inputs_by_task,
+            )
+            for task in tasks
+        ]
+    sampling["public_inputs_sha256"] = input_selection_sha256(inputs_by_task)
+    run = run.model_copy(update={"sampling_parameters": sampling})
     return run, attempts, budget.calls
 
 
@@ -430,7 +525,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--cache", type=Path, default=Path("results/runs/cache.sqlite3"))
     parser.add_argument("--config", type=Path, help="YAML model registry for live models")
     parser.add_argument("--model", default="demo", help="registered model name or demo")
-    parser.add_argument("--condition", choices=("C0", "C1"), default="C1")
+    parser.add_argument("--condition", choices=CONDITIONS, default="C1")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--limit", type=int, default=25)
     parser.add_argument("--max-calls", type=int, default=25)
@@ -460,6 +555,11 @@ def main(argv: list[str] | None = None) -> int:
         if not tasks:
             raise ValueError("No public tasks were selected.")
         if args.dry_run:
+            c3 = (
+                prepare_c3_observations(tasks, args.asset_root, limits)
+                if args.condition == "C3"
+                else None
+            )
             ceiling = min(limits.max_calls, len(tasks) * (1 + limits.max_retries))
             if limits.call_cost_ceiling_micros:
                 bounded = min(ceiling, limits.max_cost_micros // limits.call_cost_ceiling_micros)
@@ -478,6 +578,14 @@ def main(argv: list[str] | None = None) -> int:
                             bounded * limits.call_cost_ceiling_micros / _MICROS_PER_DOLLAR
                         ),
                         "model": args.model,
+                        **(
+                            {
+                                "c3_observations_sha256": c3.digest,
+                                "c3_verified_images": c3.verified_images,
+                            }
+                            if c3
+                            else {}
+                        ),
                     }
                 )
             )
