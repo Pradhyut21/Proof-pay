@@ -1,0 +1,16 @@
+[package]
+name = "pp-scoring"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "PanelProof deterministic answer scoring (interim; PP-08 owns pair/robustness metrics and manifests)"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+pp-oracle = { path = "../oracle" }
+
+[lints]
+workspace = true

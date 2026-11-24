@@ -44,8 +44,11 @@ def _flatten(obj: Any, path: str = "") -> dict[str, Any]:
 
 def scene_diff(a: Scene, b: Scene) -> list[dict[str, Any]]:
     fa, fb = _flatten(a.to_dict()), _flatten(b.to_dict())
-    return [{"path": k, "before": fa.get(k), "after": fb.get(k)} for k in sorted(set(fa) | set(fb))
-            if fa.get(k) != fb.get(k) and k != "seed"]
+    return [
+        {"path": k, "before": fa.get(k), "after": fb.get(k)}
+        for k in sorted(set(fa) | set(fb))
+        if fa.get(k) != fb.get(k) and k != "seed"
+    ]
 
 
 def _clone(scene: Scene, tag: str) -> Scene:
@@ -85,7 +88,13 @@ def make_semantic_flip(base: Scene, rng: random.Random, tag: str = "sem") -> Var
             return None
         gauge.value_milli = gauge.min_milli + rng.choice(cands) * gauge.minor_milli
         edit = f"needle_cross:{gauge.role}"
-        direction = "outlet_up" if (gauge.role == "OUTLET") == want_normal else "inlet_up" if want_normal is False else "inlet_down"
+        direction = (
+            "outlet_up"
+            if (gauge.role == "OUTLET") == want_normal
+            else "inlet_up"
+            if want_normal is False
+            else "inlet_down"
+        )
     elif edit == "alarm_toggle":
         p.alarm = not p.alarm
         direction = "alarm"
@@ -95,8 +104,9 @@ def make_semantic_flip(base: Scene, rng: random.Random, tag: str = "sem") -> Var
     after = {"state": p.state(), "x": p.alarm_consistent()}
     if after == before:
         return None
-    v = Variant("semantic", edit, p.pump_id, s, scene_diff(base, s),
-                {"before": before, "after": after, "direction": direction})
+    v = Variant(
+        "semantic", edit, p.pump_id, s, scene_diff(base, s), {"before": before, "after": after, "direction": direction}
+    )
     return v if not validate_variant(base, v) else None
 
 
@@ -125,8 +135,14 @@ def make_preserving(base: Scene, rng: random.Random, tag: str = "unit") -> Varia
         if ng.value_mkpa != g.value_mkpa:
             continue
         p.gauges[p.gauges.index(g)] = ng
-        var = Variant("preserving", f"unit_conversion:{g.role}:{g.unit}->{target}", p.pump_id, s,
-                      scene_diff(base, s), {"physical_mkpa": g.value_mkpa})
+        var = Variant(
+            "preserving",
+            f"unit_conversion:{g.role}:{g.unit}->{target}",
+            p.pump_id,
+            s,
+            scene_diff(base, s),
+            {"physical_mkpa": g.value_mkpa},
+        )
         return var if not validate_variant(base, var) else None
     return None
 
@@ -194,16 +210,31 @@ def make_missing(base: Scene, rng: random.Random, tag: str = "miss") -> Variant 
     if len(states) < 2:
         return None  # redundant evidence: not an abstention example
     p.covered = [role]
-    var = Variant("missing", f"cover:{role}", p.pump_id, s, scene_diff(base, s),
-                  {"feasible_states": sorted(states), "answer": "INSUFFICIENT"})
+    var = Variant(
+        "missing",
+        f"cover:{role}",
+        p.pump_id,
+        s,
+        scene_diff(base, s),
+        {"feasible_states": sorted(states), "answer": "INSUFFICIENT"},
+    )
     return var if not validate_variant(base, var) else None
 
 
 def truth_signature(scene: Scene) -> dict[str, Any]:
     """Order-independent physical truth (ignores appearance / permutation)."""
-    return {p.pump_id: {"run": p.run, "alarm": p.alarm, "state": p.state(), "delta": p.delta_mkpa(),
-                        "inlet": p.gauge("INLET").value_mkpa, "outlet": p.gauge("OUTLET").value_mkpa,
-                        "consistent": p.alarm_consistent()} for p in scene.pumps}
+    return {
+        p.pump_id: {
+            "run": p.run,
+            "alarm": p.alarm,
+            "state": p.state(),
+            "delta": p.delta_mkpa(),
+            "inlet": p.gauge("INLET").value_mkpa,
+            "outlet": p.gauge("OUTLET").value_mkpa,
+            "consistent": p.alarm_consistent(),
+        }
+        for p in scene.pumps
+    }
 
 
 def validate_variant(base: Scene, v: Variant) -> list[str]:
@@ -213,7 +244,10 @@ def validate_variant(base: Scene, v: Variant) -> list[str]:
         changed = [k for k in sb if sb[k] != sv[k]]
         if changed != [v.pump_id]:
             errs.append(f"semantic edit touched pumps {changed}")
-        if sb[v.pump_id]["state"] == sv[v.pump_id]["state"] and sb[v.pump_id]["consistent"] == sv[v.pump_id]["consistent"]:
+        if (
+            sb[v.pump_id]["state"] == sv[v.pump_id]["state"]
+            and sb[v.pump_id]["consistent"] == sv[v.pump_id]["consistent"]
+        ):
             errs.append("answer did not change")
         if v.edit.startswith("needle_cross"):
             d0, d1 = sb[v.pump_id]["delta"], sv[v.pump_id]["delta"]
@@ -267,6 +301,14 @@ def main_variants(argv: list[str]) -> int:  # pragma: no cover - thin CLI
                 assert not validate_variant(base, v), (k, validate_variant(base, v))
                 counts[k] += 1
         i += 1
-    print(json.dumps({"accepted_pairs": counts, "base_scenes_tried": i, "draws": attempts,
-                      "to_milli_kpa_check": to_milli_kpa(1000, "bar")}))
+    print(
+        json.dumps(
+            {
+                "accepted_pairs": counts,
+                "base_scenes_tried": i,
+                "draws": attempts,
+                "to_milli_kpa_check": to_milli_kpa(1000, "bar"),
+            }
+        )
+    )
     return 0

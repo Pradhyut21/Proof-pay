@@ -1,0 +1,476 @@
+{
+ "schema_version": "1.0.0",
+ "note": "INTERIM golden cases for PP-03/PP-08 parity, generated from the Python derivation and hand-reviewed; replace with the independent PP-04 goldens when they land.",
+ "pump_rules": [
+  {
+   "id": "stopped_ignores_gauges",
+   "run": false,
+   "inlet": {
+    "value_milli": 100000,
+    "unit": "kPa"
+   },
+   "outlet": {
+    "value_milli": 900000,
+    "unit": "kPa"
+   },
+   "inlet_mkpa": 100000,
+   "outlet_mkpa": 900000,
+   "delta_mkpa": 800000,
+   "state": "STOPPED"
+  },
+  {
+   "id": "normal_clear",
+   "run": true,
+   "inlet": {
+    "value_milli": 100000,
+    "unit": "kPa"
+   },
+   "outlet": {
+    "value_milli": 500000,
+    "unit": "kPa"
+   },
+   "inlet_mkpa": 100000,
+   "outlet_mkpa": 500000,
+   "delta_mkpa": 400000,
+   "state": "NORMAL"
+  },
+  {
+   "id": "low_clear",
+   "run": true,
+   "inlet": {
+    "value_milli": 200000,
+    "unit": "kPa"
+   },
+   "outlet": {
+    "value_milli": 300000,
+    "unit": "kPa"
+   },
+   "inlet_mkpa": 200000,
+   "outlet_mkpa": 300000,
+   "delta_mkpa": 100000,
+   "state": "LOW_PRESSURE"
+  },
+  {
+   "id": "threshold_equal_kpa",
+   "run": true,
+   "inlet": {
+    "value_milli": 200000,
+    "unit": "kPa"
+   },
+   "outlet": {
+    "value_milli": 500000,
+    "unit": "kPa"
+   },
+   "inlet_mkpa": 200000,
+   "outlet_mkpa": 500000,
+   "delta_mkpa": 300000,
+   "state": "NORMAL"
+  },
+  {
+   "id": "one_milli_below",
+   "run": true,
+   "inlet": {
+    "value_milli": 200001,
+    "unit": "kPa"
+   },
+   "outlet": {
+    "value_milli": 500000,
+    "unit": "kPa"
+   },
+   "inlet_mkpa": 200001,
+   "outlet_mkpa": 500000,
+   "delta_mkpa": 299999,
+   "state": "LOW_PRESSURE"
+  },
+  {
+   "id": "one_milli_above",
+   "run": true,
+   "inlet": {
+    "value_milli": 199999,
+    "unit": "kPa"
+   },
+   "outlet": {
+    "value_milli": 500000,
+    "unit": "kPa"
+   },
+   "inlet_mkpa": 199999,
+   "outlet_mkpa": 500000,
+   "delta_mkpa": 300001,
+   "state": "NORMAL"
+  },
+  {
+   "id": "mixed_bar_kpa_equal",
+   "run": true,
+   "inlet": {
+    "value_milli": 2000,
+    "unit": "bar"
+   },
+   "outlet": {
+    "value_milli": 500000,
+    "unit": "kPa"
+   },
+   "inlet_mkpa": 200000,
+   "outlet_mkpa": 500000,
+   "delta_mkpa": 300000,
+   "state": "NORMAL"
+  },
+  {
+   "id": "mixed_bar_bar_normal",
+   "run": true,
+   "inlet": {
+    "value_milli": 1000,
+    "unit": "bar"
+   },
+   "outlet": {
+    "value_milli": 4500,
+    "unit": "bar"
+   },
+   "inlet_mkpa": 100000,
+   "outlet_mkpa": 450000,
+   "delta_mkpa": 350000,
+   "state": "NORMAL"
+  },
+  {
+   "id": "mixed_bar_bar_low",
+   "run": true,
+   "inlet": {
+    "value_milli": 1000,
+    "unit": "bar"
+   },
+   "outlet": {
+    "value_milli": 3500,
+    "unit": "bar"
+   },
+   "inlet_mkpa": 100000,
+   "outlet_mkpa": 350000,
+   "delta_mkpa": 250000,
+   "state": "LOW_PRESSURE"
+  },
+  {
+   "id": "psi_normal",
+   "run": true,
+   "inlet": {
+    "value_milli": 10000,
+    "unit": "psi"
+   },
+   "outlet": {
+    "value_milli": 100000,
+    "unit": "psi"
+   },
+   "inlet_mkpa": 68948,
+   "outlet_mkpa": 689476,
+   "delta_mkpa": 620528,
+   "state": "NORMAL"
+  },
+  {
+   "id": "psi_low",
+   "run": true,
+   "inlet": {
+    "value_milli": 20000,
+    "unit": "psi"
+   },
+   "outlet": {
+    "value_milli": 60000,
+    "unit": "psi"
+   },
+   "inlet_mkpa": 137895,
+   "outlet_mkpa": 413685,
+   "delta_mkpa": 275790,
+   "state": "LOW_PRESSURE"
+  },
+  {
+   "id": "psi_inlet_kpa_outlet",
+   "run": true,
+   "inlet": {
+    "value_milli": 20000,
+    "unit": "psi"
+   },
+   "outlet": {
+    "value_milli": 450000,
+    "unit": "kPa"
+   },
+   "inlet_mkpa": 137895,
+   "outlet_mkpa": 450000,
+   "delta_mkpa": 312105,
+   "state": "NORMAL"
+  },
+  {
+   "id": "negative_delta_low",
+   "run": true,
+   "inlet": {
+    "value_milli": 500000,
+    "unit": "kPa"
+   },
+   "outlet": {
+    "value_milli": 200000,
+    "unit": "kPa"
+   },
+   "inlet_mkpa": 500000,
+   "outlet_mkpa": 200000,
+   "delta_mkpa": -300000,
+   "state": "LOW_PRESSURE"
+  },
+  {
+   "id": "zero_delta_low",
+   "run": true,
+   "inlet": {
+    "value_milli": 300000,
+    "unit": "kPa"
+   },
+   "outlet": {
+    "value_milli": 300000,
+    "unit": "kPa"
+   },
+   "inlet_mkpa": 300000,
+   "outlet_mkpa": 300000,
+   "delta_mkpa": 0,
+   "state": "LOW_PRESSURE"
+  },
+  {
+   "id": "stopped_low_gauges",
+   "run": false,
+   "inlet": {
+    "value_milli": 300000,
+    "unit": "kPa"
+   },
+   "outlet": {
+    "value_milli": 300000,
+    "unit": "kPa"
+   },
+   "inlet_mkpa": 300000,
+   "outlet_mkpa": 300000,
+   "delta_mkpa": 0,
+   "state": "STOPPED"
+  },
+  {
+   "id": "bar_fraction_normal",
+   "run": true,
+   "inlet": {
+    "value_milli": 1200,
+    "unit": "bar"
+   },
+   "outlet": {
+    "value_milli": 4300,
+    "unit": "bar"
+   },
+   "inlet_mkpa": 120000,
+   "outlet_mkpa": 430000,
+   "delta_mkpa": 310000,
+   "state": "NORMAL"
+  },
+  {
+   "id": "bar_fraction_boundary",
+   "run": true,
+   "inlet": {
+    "value_milli": 1000,
+    "unit": "bar"
+   },
+   "outlet": {
+    "value_milli": 4000,
+    "unit": "bar"
+   },
+   "inlet_mkpa": 100000,
+   "outlet_mkpa": 400000,
+   "delta_mkpa": 300000,
+   "state": "NORMAL"
+  },
+  {
+   "id": "psi_rounding_tie_away",
+   "run": true,
+   "inlet": {
+    "value_milli": 1,
+    "unit": "psi"
+   },
+   "outlet": {
+    "value_milli": 1,
+    "unit": "psi"
+   },
+   "inlet_mkpa": 7,
+   "outlet_mkpa": 7,
+   "delta_mkpa": 0,
+   "state": "LOW_PRESSURE"
+  },
+  {
+   "id": "large_values_normal",
+   "run": true,
+   "inlet": {
+    "value_milli": 0,
+    "unit": "kPa"
+   },
+   "outlet": {
+    "value_milli": 1000000,
+    "unit": "kPa"
+   },
+   "inlet_mkpa": 0,
+   "outlet_mkpa": 1000000,
+   "delta_mkpa": 1000000,
+   "state": "NORMAL"
+  },
+  {
+   "id": "kpa_zero_both",
+   "run": true,
+   "inlet": {
+    "value_milli": 0,
+    "unit": "kPa"
+   },
+   "outlet": {
+    "value_milli": 0,
+    "unit": "kPa"
+   },
+   "inlet_mkpa": 0,
+   "outlet_mkpa": 0,
+   "delta_mkpa": 0,
+   "state": "LOW_PRESSURE"
+  },
+  {
+   "id": "psi_near_boundary_a",
+   "run": true,
+   "inlet": {
+    "value_milli": 0,
+    "unit": "psi"
+   },
+   "outlet": {
+    "value_milli": 43511,
+    "unit": "psi"
+   },
+   "inlet_mkpa": 0,
+   "outlet_mkpa": 299998,
+   "delta_mkpa": 299998,
+   "state": "LOW_PRESSURE"
+  },
+  {
+   "id": "psi_near_boundary_b",
+   "run": true,
+   "inlet": {
+    "value_milli": 0,
+    "unit": "psi"
+   },
+   "outlet": {
+    "value_milli": 43510,
+    "unit": "psi"
+   },
+   "inlet_mkpa": 0,
+   "outlet_mkpa": 299991,
+   "delta_mkpa": 299991,
+   "state": "LOW_PRESSURE"
+  }
+ ],
+ "units": [
+  {
+   "from": "bar",
+   "to": "kPa",
+   "value_milli": 1,
+   "expect": 100
+  },
+  {
+   "from": "psi",
+   "to": "kPa",
+   "value_milli": 1000,
+   "expect": 6895
+  },
+  {
+   "from": "kPa",
+   "to": "psi",
+   "value_milli": 100000,
+   "expect": 14504
+  },
+  {
+   "from": "kPa",
+   "to": "bar",
+   "value_milli": 250,
+   "expect": 3
+  },
+  {
+   "from": "psi",
+   "to": "bar",
+   "value_milli": 14504,
+   "expect": 1000
+  }
+ ],
+ "scoring": [
+  {
+   "answer": {
+    "kind": "category",
+    "value": "NORMAL"
+   },
+   "response": {
+    "kind": "category",
+    "value": "NORMAL"
+   },
+   "expect": "correct"
+  },
+  {
+   "answer": {
+    "kind": "category",
+    "value": "NORMAL"
+   },
+   "response": {
+    "kind": "category",
+    "value": "STOPPED"
+   },
+   "expect": "incorrect"
+  },
+  {
+   "answer": {
+    "kind": "category",
+    "value": "NORMAL"
+   },
+   "response": {
+    "kind": "numeric",
+    "value_milli": 1,
+    "unit": "kPa"
+   },
+   "expect": "invalid"
+  },
+  {
+   "answer": {
+    "kind": "numeric",
+    "value_milli": 540000,
+    "unit": "kPa",
+    "tolerance_milli": 20000
+   },
+   "response": {
+    "kind": "numeric",
+    "value_milli": 560000,
+    "unit": "kPa"
+   },
+   "expect": "correct"
+  },
+  {
+   "answer": {
+    "kind": "numeric",
+    "value_milli": 540000,
+    "unit": "kPa",
+    "tolerance_milli": 20000
+   },
+   "response": {
+    "kind": "numeric",
+    "value_milli": 560001,
+    "unit": "kPa"
+   },
+   "expect": "incorrect"
+  },
+  {
+   "answer": {
+    "kind": "numeric",
+    "value_milli": 540000,
+    "unit": "kPa",
+    "tolerance_milli": 20000
+   },
+   "response": {
+    "kind": "numeric",
+    "value_milli": 540000,
+    "unit": "bar"
+   },
+   "expect": "invalid"
+  },
+  {
+   "answer": {
+    "kind": "category",
+    "value": "CONSISTENT"
+   },
+   "response": null,
+   "expect": "invalid"
+  }
+ ]
+}

@@ -179,9 +179,7 @@ def layout_pump(pump: Pump, rect: tuple[int, int, int, int]) -> None:
         g.r = r
     lx = x1 - LAMP_COL_W // 2 - 4
     yc = (y0 + 64 + y1) // 2
-    pump.lamps = {
-        name: (lx, yc + (-1 if i == 0 else 1) * 62, 24) for i, name in enumerate(pump.lamp_order)
-    }
+    pump.lamps = {name: (lx, yc + (-1 if i == 0 else 1) * 62, 24) for i, name in enumerate(pump.lamp_order)}
 
 
 # ---------------------------------------------------------------- generation

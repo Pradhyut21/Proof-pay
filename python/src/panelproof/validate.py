@@ -53,7 +53,9 @@ def compare_trace_to_scene(trace: dict[str, Any], scene: Scene) -> dict[str, Any
 
 def verify_dataset_dir(root: Path, out: Path | None = None) -> dict[str, Any]:
     """Verify every PNG in a `panelproof generate` directory and compare to private truth."""
-    records = [json.loads(line) for line in (root / "private" / "scenes.jsonl").read_text(encoding="utf-8").splitlines()]
+    records = [
+        json.loads(line) for line in (root / "private" / "scenes.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
     traces, reasons = [], Counter()
     agree = verified = exact = 0
     for rec in records:
@@ -68,7 +70,8 @@ def verify_dataset_dir(root: Path, out: Path | None = None) -> dict[str, Any]:
             reasons.update(p["reasons"])
         exact += cmp_["agree"] and all(
             abs(p.get("inlet_error_ticks", 9)) < 1e-9 and abs(p.get("outlet_error_ticks", 9)) < 1e-9
-            for p in cmp_["pumps"])
+            for p in cmp_["pumps"]
+        )
     summary = {
         "verifier_version": VERIFIER_VERSION,
         "scenes": len(records),

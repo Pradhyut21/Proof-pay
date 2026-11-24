@@ -20,3 +20,5 @@ data/runs/
 .env.local
 playwright-report/
 test-results/
+data/runs_e2e/
+*.tsbuildinfo

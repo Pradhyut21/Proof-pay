@@ -46,8 +46,9 @@ def apply(axis: str, img: np.ndarray, rng: np.random.Generator) -> np.ndarray:
         return cv2.warpAffine(img, m, (img.shape[1], img.shape[0]), borderMode=cv2.BORDER_REPLICATE)
     if axis == "scale_0.97":
         small = cv2.resize(img, None, fx=0.97, fy=0.97, interpolation=cv2.INTER_AREA)
-        out = cv2.copyMakeBorder(small, 0, img.shape[0] - small.shape[0], 0, img.shape[1] - small.shape[1],
-                                 cv2.BORDER_REPLICATE)
+        out = cv2.copyMakeBorder(
+            small, 0, img.shape[0] - small.shape[0], 0, img.shape[1] - small.shape[1], cv2.BORDER_REPLICATE
+        )
         return out
     if axis == "glare_over_panel":
         ov = img.copy()
@@ -56,8 +57,17 @@ def apply(axis: str, img: np.ndarray, rng: np.random.Generator) -> np.ndarray:
     raise ValueError(axis)
 
 
-AXES = ["none", "brightness_+15%", "brightness_-15%", "gaussian_noise_sigma3", "gaussian_blur_0.6", "jpeg_q90",
-        "rotate_1deg", "scale_0.97", "glare_over_panel"]
+AXES = [
+    "none",
+    "brightness_+15%",
+    "brightness_-15%",
+    "gaussian_noise_sigma3",
+    "gaussian_blur_0.6",
+    "jpeg_q90",
+    "rotate_1deg",
+    "scale_0.97",
+    "glare_over_panel",
+]
 
 
 def _one(args: tuple[str, dict, str]) -> tuple[str, str, list[str]]:
@@ -72,12 +82,16 @@ def _one(args: tuple[str, dict, str]) -> tuple[str, str, list[str]]:
     if trace["status"] == "verified":
         return axis, "verified_wrong", reasons
     # a partially verified scene with wrong values counts as wrong only if a verified pump disagrees
-    wrong = any(p["verdict"] == "verified" and pc.get("errors") for p, pc in zip(trace["pumps"], cmp_["pumps"], strict=False))
+    wrong = any(
+        p["verdict"] == "verified" and pc.get("errors") for p, pc in zip(trace["pumps"], cmp_["pumps"], strict=False)
+    )
     return axis, "verified_wrong" if wrong else "rejected", reasons
 
 
 def run_perturbations(root: Path, limit: int = 60, workers: int = 4) -> dict[str, Any]:
-    recs = [json.loads(line) for line in (root / "private" / "scenes.jsonl").read_text(encoding="utf-8").splitlines()][:limit]
+    recs = [json.loads(line) for line in (root / "private" / "scenes.jsonl").read_text(encoding="utf-8").splitlines()][
+        :limit
+    ]
     jobs = [(str(root / "images" / f"{r['scene_id']}.png"), r["scene"], ax) for r in recs for ax in AXES]
     with ProcessPoolExecutor(max_workers=workers) as ex:
         res = list(ex.map(_one, jobs, chunksize=8))
@@ -89,8 +103,11 @@ def run_perturbations(root: Path, limit: int = 60, workers: int = 4) -> dict[str
     table = {}
     for ax in AXES:
         n = sum(by[ax].values())
-        table[ax] = {"n": n, **{k: by[ax][k] for k in ("verified_correct", "rejected", "verified_wrong")},
-                     "agreement_rate": round(by[ax]["verified_correct"] / n, 3),
-                     "false_accept_rate": round(by[ax]["verified_wrong"] / n, 3),
-                     "top_rejection_reasons": dict(why[ax].most_common(3))}
+        table[ax] = {
+            "n": n,
+            **{k: by[ax][k] for k in ("verified_correct", "rejected", "verified_wrong")},
+            "agreement_rate": round(by[ax]["verified_correct"] / n, 3),
+            "false_accept_rate": round(by[ax]["verified_wrong"] / n, 3),
+            "top_rejection_reasons": dict(why[ax].most_common(3)),
+        }
     return {"scenes": len(recs), "axes": table}

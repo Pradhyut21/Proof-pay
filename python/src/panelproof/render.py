@@ -21,22 +21,58 @@ START_DEG, SWEEP_DEG = 225.0, 270.0
 TRACKING = 2
 
 THEMES: dict[str, dict[str, tuple[int, int, int]]] = {
-    "daylight": dict(bg=(226, 230, 235), module=(245, 247, 250), border=(120, 130, 145),
-                     rim=(60, 66, 78), face=(252, 252, 248), tick=(30, 30, 35), text=(25, 28, 35),
-                     needle=(200, 40, 30), lamp_off=(150, 150, 155), run_on=(40, 190, 80),
-                     alarm_on=(230, 40, 40)),
-    "slate": dict(bg=(28, 32, 40), module=(52, 60, 74), border=(110, 120, 140),
-                  rim=(16, 18, 24), face=(232, 236, 240), tick=(20, 20, 26), text=(235, 238, 245),
-                  needle=(240, 120, 20), lamp_off=(100, 102, 108), run_on=(60, 220, 110),
-                  alarm_on=(255, 70, 60)),
-    "sand": dict(bg=(214, 205, 188), module=(238, 230, 214), border=(130, 115, 90),
-                 rim=(90, 70, 45), face=(255, 252, 240), tick=(50, 40, 30), text=(45, 35, 25),
-                 needle=(170, 30, 40), lamp_off=(160, 150, 135), run_on=(50, 170, 70),
-                 alarm_on=(215, 45, 40)),
-    "teal": dict(bg=(200, 222, 224), module=(228, 242, 243), border=(60, 110, 118),
-                 rim=(20, 80, 90), face=(250, 254, 254), tick=(15, 40, 46), text=(12, 40, 46),
-                 needle=(215, 60, 20), lamp_off=(140, 160, 162), run_on=(30, 180, 90),
-                 alarm_on=(225, 45, 55)),
+    "daylight": dict(
+        bg=(226, 230, 235),
+        module=(245, 247, 250),
+        border=(120, 130, 145),
+        rim=(60, 66, 78),
+        face=(252, 252, 248),
+        tick=(30, 30, 35),
+        text=(25, 28, 35),
+        needle=(200, 40, 30),
+        lamp_off=(150, 150, 155),
+        run_on=(40, 190, 80),
+        alarm_on=(230, 40, 40),
+    ),
+    "slate": dict(
+        bg=(28, 32, 40),
+        module=(52, 60, 74),
+        border=(110, 120, 140),
+        rim=(16, 18, 24),
+        face=(232, 236, 240),
+        tick=(20, 20, 26),
+        text=(235, 238, 245),
+        needle=(240, 120, 20),
+        lamp_off=(100, 102, 108),
+        run_on=(60, 220, 110),
+        alarm_on=(255, 70, 60),
+    ),
+    "sand": dict(
+        bg=(214, 205, 188),
+        module=(238, 230, 214),
+        border=(130, 115, 90),
+        rim=(90, 70, 45),
+        face=(255, 252, 240),
+        tick=(50, 40, 30),
+        text=(45, 35, 25),
+        needle=(170, 30, 40),
+        lamp_off=(160, 150, 135),
+        run_on=(50, 170, 70),
+        alarm_on=(215, 45, 40),
+    ),
+    "teal": dict(
+        bg=(200, 222, 224),
+        module=(228, 242, 243),
+        border=(60, 110, 118),
+        rim=(20, 80, 90),
+        face=(250, 254, 254),
+        tick=(15, 40, 46),
+        text=(12, 40, 46),
+        needle=(215, 60, 20),
+        lamp_off=(140, 160, 162),
+        run_on=(30, 180, 90),
+        alarm_on=(225, 45, 55),
+    ),
 }
 COVER = (110, 110, 116)
 
@@ -51,8 +87,15 @@ def text_width(text: str, size: int) -> float:
     return sum(f.getlength(c) for c in text) + TRACKING * (len(text) - 1)
 
 
-def draw_text(d: ImageDraw.ImageDraw, x: float, baseline: float, text: str, size: int,
-              fill: tuple[int, int, int], align: str = "center") -> tuple[int, int, int, int]:
+def draw_text(
+    d: ImageDraw.ImageDraw,
+    x: float,
+    baseline: float,
+    text: str,
+    size: int,
+    fill: tuple[int, int, int],
+    align: str = "center",
+) -> tuple[int, int, int, int]:
     """Draw tracked text; returns the (x0, y0, x1, y1) ink box estimate."""
     f = font(size)
     total = text_width(text, size)
@@ -131,8 +174,9 @@ def draw_pump(d: ImageDraw.ImageDraw, p: Pump, th: dict, fs: float) -> None:
         on_col = th["run_on"] if name == "RUN" else th["alarm_on"]
         if on:
             d.ellipse((lx - lr - 6, ly - lr - 6, lx + lr + 6, ly + lr + 6), fill=blend(th["module"], on_col, 0.35))
-        d.ellipse((lx - lr, ly - lr, lx + lr, ly + lr), fill=on_col if on else th["lamp_off"],
-                  outline=th["rim"], width=3)
+        d.ellipse(
+            (lx - lr, ly - lr, lx + lr, ly + lr), fill=on_col if on else th["lamp_off"], outline=th["rim"], width=3
+        )
         draw_text(d, lx, ly + lr + 30, name, round(16 * fs), th["text"])
 
 
@@ -164,12 +208,16 @@ def evidence_annotations(scene: Scene) -> list[dict]:
         out.append({"pump": p.pump_id, "kind": "module", "box": list(p.module)})
         for g in p.gauges:
             tip = polar(g.cx, g.cy, 0.72 * g.r, angle_for(g))
-            out.append({"pump": p.pump_id, "kind": f"gauge_{g.role.lower()}",
-                        "box": [g.cx - g.r, g.cy - g.r, g.cx + g.r, g.cy + g.r],
-                        "needle_tip": [round(tip[0], 1), round(tip[1], 1)]})
+            out.append(
+                {
+                    "pump": p.pump_id,
+                    "kind": f"gauge_{g.role.lower()}",
+                    "box": [g.cx - g.r, g.cy - g.r, g.cx + g.r, g.cy + g.r],
+                    "needle_tip": [round(tip[0], 1), round(tip[1], 1)],
+                }
+            )
         for name, (lx, ly, lr) in p.lamps.items():
-            out.append({"pump": p.pump_id, "kind": f"lamp_{name.lower()}",
-                        "box": [lx - lr, ly - lr, lx + lr, ly + lr]})
+            out.append({"pump": p.pump_id, "kind": f"lamp_{name.lower()}", "box": [lx - lr, ly - lr, lx + lr, ly + lr]})
     return out
 
 
@@ -196,12 +244,12 @@ def check_layout(scene: Scene) -> list[str]:
             boxes.append((f"{p.pump_id}:{name}", b))
     inner = [(n, b) for n, b in boxes if not n.endswith(":module")]
     for i, (na, a) in enumerate(inner):
-        for nb, b in inner[i + 1:]:
+        for nb, b in inner[i + 1 :]:
             if not (a[2] <= b[0] or b[2] <= a[0] or a[3] <= b[1] or b[3] <= a[1]):
                 errs.append(f"overlap {na} / {nb}")
     mods = [(n, b) for n, b in boxes if n.endswith(":module")]
     for i, (na, a) in enumerate(mods):
-        for nb, b in mods[i + 1:]:
+        for nb, b in mods[i + 1 :]:
             if not (a[2] <= b[0] or b[2] <= a[0] or a[3] <= b[1] or b[3] <= a[1]):
                 errs.append(f"module overlap {na} / {nb}")
     return errs
