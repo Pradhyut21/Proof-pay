@@ -1,0 +1,31 @@
+{
+  "count": 6,
+  "difficulty": "medium",
+  "files": {
+    "images/im_19469abb6e5979fb.png": "19469abb6e5979fbd0ed14f8bdae9cfb70cc1c5e79a646b2a73476a17af7e38c",
+    "images/im_3456f8470d9f5249.png": "3456f8470d9f5249bb53be60f3e2edb7865d8cfa88edd07b989319220ab58f2f",
+    "images/im_3fa7594e8e8c4a61.png": "3fa7594e8e8c4a610faf7e9826764e19bb1ac206b72fdf456abd5ffb193549bb",
+    "images/im_41a4b2a901dd5c4f.png": "41a4b2a901dd5c4ffd094f6fd1bc0c72f90123e3956b9b529128c8f643f3747e",
+    "images/im_540597c880713463.png": "540597c8807134635f9b311970fb77cd4c230e060546e9379d7b577c03570a6a",
+    "images/im_55e48d3b346d368d.png": "55e48d3b346d368d076c0aa477f620cc81a64825758c327dd0c6509f8fa8cc2b",
+    "images/im_584678179adf0e04.png": "584678179adf0e04a0a83e9e3b636809c9955d7c7a8895aaf2c1b1edb728a7e7",
+    "images/im_5eee6914588dbabb.png": "5eee6914588dbabb2e8be02585d155cb3f29c75c4ee08738eb13c1d114a5b259",
+    "images/im_5f7d883f37448353.png": "5f7d883f374483537f403a9b8eb64742de492aa125947b23ac0065cb35a925c7",
+    "images/im_68c1a5b949b1392a.png": "68c1a5b949b1392abd32ce0e2521f7bd376efc789302cb2968f20c5f08b6d10f",
+    "images/im_83dd08efc687b975.png": "83dd08efc687b975229798bc6398d5f05179eee979004b1ceb7ebaf4b42246e0",
+    "images/im_908099692f9916fc.png": "908099692f9916fce2e72f2ec4af5e20a7e5d013948baed6338646411cc0200a",
+    "images/im_964005e039991a42.png": "964005e039991a42cef9308b0a62723f4b6bde3011a804ce5ba8800ec0c14da8",
+    "images/im_a4d05eed1b55192c.png": "a4d05eed1b55192c4a13dbd638f003a8d8ef79550bf7ffe0c49b0bfeb73ff751",
+    "images/im_b5fd5c270a776bca.png": "b5fd5c270a776bca0a74c9cc1cd14ca5ba24aad2978e0b7d1ea0470cef23b5c3",
+    "images/im_bd85c090035317fc.png": "bd85c090035317fcdc6a6e113e99541a5f26d273077c59cb87acceded31e37c0",
+    "images/im_e30e34b48111a879.png": "e30e34b48111a879ed8865d5e3604092b7a1d34b486d6a486b5aeacdc0ee0031",
+    "images/im_f287af90b2307e92.png": "f287af90b2307e92804b51c8b908c6fd6d221daf332b4731300b36d3e708936e",
+    "model_attempts.jsonl": "a9da6a227e9853fa2bf16268ff149dd9eb51eddba5c7d34db44f413d2191581f",
+    "pairs.jsonl": "08ab538c7928c41f52695b048f18e1c2097ea9617888201783878ae0b85301df",
+    "sample_keys.jsonl": "e7ba22e666520c006f6c9dafb5c6378ac5dd65acffab0023131b7847698c0a24",
+    "sample_validation.jsonl": "9f723c23edf3e550befb7be11ff9e1f436a2ec5d6972478984effd1a6c5fa289",
+    "tasks.jsonl": "0eda4878d6cdf410ad0e4d687adb2fc971707d3c68a6b8b59301b1bab3a87753"
+  },
+  "schema_version": "1.0.0",
+  "seed": "demo"
+}

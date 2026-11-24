@@ -1,0 +1,67 @@
+{
+  "python": "3.12.10",
+  "platform": "win32",
+  "steps": [
+    {
+      "step": "generate 4 base scenes",
+      "status": "pass",
+      "detail": "{\"count\": 4, \"manifest_sha256\": \"4f4974565bc4db4b2160387336911358996b315cd8f0452de617240b744ac9c1\", \"render_ms\": {\"mean\": 38.7, \"max\": 93.0}}"
+    },
+    {
+      "step": "verify rasters independently",
+      "status": "pass",
+      "detail": "{\"verifier_version\": \"1.0.0\", \"scenes\": 4, \"verified\": 4, \"agree_with_truth\": 4, \"exact_tick_agreement\": 4, \"rejection_reasons\": {}}"
+    },
+    {
+      "step": "export task bundle",
+      "status": "pass",
+      "detail": "{\"tasks\": 6, \"pairs\": 4, \"skipped_candidates\": 0, \"out\": \"C:\\\\Users\\\\saiki\\\\AppData\\\\Local\\\\Temp\\\\pp-smoke-ss48lp33\\\\factory\"}"
+    },
+    {
+      "step": "cargo build -p pp-api",
+      "status": "pass",
+      "detail": "Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.43s"
+    },
+    {
+      "step": "API starts",
+      "status": "pass",
+      "detail": "{\"service\": \"pp-api\", \"status\": \"ok\", \"tasks_loaded\": 6, \"version\": \"0.1.0\"}"
+    },
+    {
+      "step": "public tasks hide answers",
+      "status": "fail",
+      "detail": "6 tasks"
+    },
+    {
+      "step": "human attempt (correct) scores correct",
+      "status": "pass",
+      "detail": "correct"
+    },
+    {
+      "step": "malformed attempt scores invalid",
+      "status": "pass",
+      "detail": "invalid"
+    },
+    {
+      "step": "reveal rejects a bad token",
+      "status": "pass",
+      "detail": "HTTP 403"
+    },
+    {
+      "step": "generation job completes",
+      "status": "pass",
+      "detail": "succeeded"
+    },
+    {
+      "step": "web pages respond",
+      "status": "pass",
+      "detail": "{\"/\": 200, \"/factory\": 200, \"/arena\": 200}"
+    },
+    {
+      "step": "offline demo attempts",
+      "status": "fail",
+      "detail": ""
+    }
+  ],
+  "failed": 2
+}

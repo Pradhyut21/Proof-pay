@@ -1,0 +1,81 @@
+"use client";
+
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { imageUrl } from "@/lib/api";
+import { IMAGE_HEIGHT, IMAGE_WIDTH, type EvidenceBox, type PublicTask } from "@/lib/types";
+
+const ZOOMS = [1, 1.5, 2, 3];
+
+interface Props {
+  task: PublicTask;
+  label: string;
+  evidence?: EvidenceBox[];
+}
+
+/** Panel image with zoom. Evidence boxes are drawn only when the backend has revealed them. */
+export function PanelViewer({ task, label, evidence }: Props) {
+  const [zoom, setZoom] = useState(1);
+  const idx = ZOOMS.indexOf(zoom);
+  return (
+    <figure className="space-y-2" data-testid={`panel-${label}`}>
+      <figcaption className="flex flex-wrap items-center justify-between gap-2">
+        <span className="font-semibold">{label}</span>
+        <span className="flex items-center gap-1" role="group" aria-label={`Zoom for ${label}`}>
+          <Button
+            size="sm"
+            variant="outline"
+            aria-label={`Zoom out ${label}`}
+            disabled={idx <= 0}
+            onClick={() => setZoom(ZOOMS[Math.max(0, idx - 1)] ?? 1)}
+          >
+            −
+          </Button>
+          <span className="min-w-12 text-center text-sm" aria-live="polite">
+            {Math.round(zoom * 100)}%
+          </span>
+          <Button
+            size="sm"
+            variant="outline"
+            aria-label={`Zoom in ${label}`}
+            disabled={idx >= ZOOMS.length - 1}
+            onClick={() => setZoom(ZOOMS[Math.min(ZOOMS.length - 1, idx + 1)] ?? 1)}
+          >
+            +
+          </Button>
+        </span>
+      </figcaption>
+      <div
+        className="max-h-[32rem] overflow-auto rounded-md border border-border bg-muted"
+        tabIndex={0}
+        role="region"
+        aria-label={`${label} image, scrollable`}
+      >
+        <div className="relative" style={{ width: `${zoom * 100}%` }}>
+          {/* eslint-disable-next-line @next/next/no-img-element -- local API image, intrinsic size known */}
+          <img
+            src={imageUrl(task.image)}
+            alt={`${label}: synthetic water-pump control panel with two dials and RUN and ALARM lamps`}
+            width={IMAGE_WIDTH}
+            height={IMAGE_HEIGHT}
+            className="block h-auto w-full"
+          />
+          {evidence?.map((e, i) => (
+            <div
+              key={`${e.kind}-${i}`}
+              data-testid="evidence-box"
+              title={`${e.pump} ${e.kind}`}
+              className="pointer-events-none absolute border-2 border-dashed border-primary"
+              style={{
+                left: `${(e.box[0] / IMAGE_WIDTH) * 100}%`,
+                top: `${(e.box[1] / IMAGE_HEIGHT) * 100}%`,
+                width: `${((e.box[2] - e.box[0]) / IMAGE_WIDTH) * 100}%`,
+                height: `${((e.box[3] - e.box[1]) / IMAGE_HEIGHT) * 100}%`,
+              }}
+            />
+          ))}
+        </div>
+      </div>
+    </figure>
+  );
+}

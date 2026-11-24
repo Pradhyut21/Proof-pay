@@ -1,0 +1,59 @@
+{
+  "answer_class_counts": {
+    "consistency": {
+      "classes": {
+        "CONSISTENT": {
+          "alarm_off": 0.66,
+          "alarm_on": 0.349,
+          "overall": 0.511
+        },
+        "INCONSISTENT": {
+          "alarm_off": 0.34,
+          "alarm_on": 0.651,
+          "overall": 0.489
+        }
+      },
+      "max_abs_shift_pp": 31.1,
+      "n": 180
+    },
+    "state": {
+      "classes": {
+        "LOW_PRESSURE": {
+          "alarm_off": 0.35,
+          "alarm_on": 0.354,
+          "overall": 0.352
+        },
+        "NORMAL": {
+          "alarm_off": 0.35,
+          "alarm_on": 0.323,
+          "overall": 0.337
+        },
+        "STOPPED": {
+          "alarm_off": 0.301,
+          "alarm_on": 0.323,
+          "overall": 0.312
+        }
+      },
+      "max_abs_shift_pp": 2.7,
+      "n": 199
+    }
+  },
+  "files_with_hash_drift": [],
+  "groups_in_multiple_splits": 0,
+  "images_in_multiple_splits": 0,
+  "layout_families": {
+    "dev": [
+      "1p-single",
+      "2p-rows"
+    ],
+    "frozen": [
+      "1p-single",
+      "2p-rows"
+    ]
+  },
+  "pass": true,
+  "private_answer_records": 631,
+  "public_records_with_private_fields_or_seeds": 0,
+  "rebuild_manifest_equal": true,
+  "seed_overlap_dev_frozen": 0
+}

@@ -29,8 +29,12 @@ TRACKING = 2
 UNITS = ("kPa", "bar", "psi")
 PUMP_LABELS = tuple(f"PUMP {c}" for c in "ABCDEF")
 SNAP_FRAC = 0.30  # needle within 0.30 minor tick of a tick is snapped
-TOLERANCES = {"needle_snap_ticks": SNAP_FRAC, "reading_uncertainty_ticks_snapped": 0.5,
-              "text_iou_min": 0.72, "tick_angle_dev_deg": 1.5}
+TOLERANCES = {
+    "needle_snap_ticks": SNAP_FRAC,
+    "reading_uncertainty_ticks_snapped": 0.5,
+    "text_iou_min": 0.72,
+    "tick_angle_dev_deg": 1.5,
+}
 
 
 # ------------------------------------------------------------------ text-mask matching
@@ -53,7 +57,7 @@ def _text_mask(text: str, size: int) -> np.ndarray:
         x += f.getlength(ch) + TRACKING
     a = np.asarray(im) >= 128
     ys, xs = np.where(a)
-    return a[ys.min(): ys.max() + 1, xs.min(): xs.max() + 1]
+    return a[ys.min() : ys.max() + 1, xs.min() : xs.max() + 1]
 
 
 @lru_cache(maxsize=65536)
@@ -69,9 +73,9 @@ def _iou(a: np.ndarray, b: np.ndarray) -> float:
             h, w = max(a.shape[0], b.shape[0]) + 2, max(a.shape[1], b.shape[1]) + 2
             pa = np.zeros((h, w), bool)
             pb = np.zeros((h, w), bool)
-            pa[1: 1 + a.shape[0], 1: 1 + a.shape[1]] = a
+            pa[1 : 1 + a.shape[0], 1 : 1 + a.shape[1]] = a
             y0, x0 = 1 + dy, 1 + dx
-            pb[y0: y0 + b.shape[0], x0: x0 + b.shape[1]] = b
+            pb[y0 : y0 + b.shape[0], x0 : x0 + b.shape[1]] = b
             inter = np.logical_and(pa, pb).sum()
             union = np.logical_or(pa, pb).sum()
             best = max(best, inter / union if union else 0.0)
@@ -81,8 +85,11 @@ def _iou(a: np.ndarray, b: np.ndarray) -> float:
 def _glyph_components(mask: np.ndarray) -> list[np.ndarray]:
     """Glyph crops left-to-right; components whose x-ranges overlap (i-dots) are merged."""
     n, lab, stats, _ = cv2.connectedComponentsWithStats(mask.astype(np.uint8), connectivity=8)
-    boxes = [[stats[k, 0], stats[k, 1], stats[k, 0] + stats[k, 2], stats[k, 1] + stats[k, 3]] for k in range(1, n)
-             if stats[k, 4] >= 3]
+    boxes = [
+        [stats[k, 0], stats[k, 1], stats[k, 0] + stats[k, 2], stats[k, 1] + stats[k, 3]]
+        for k in range(1, n)
+        if stats[k, 4] >= 3
+    ]
     boxes.sort()
     merged: list[list[int]] = []
     for bx in boxes:
@@ -91,7 +98,7 @@ def _glyph_components(mask: np.ndarray) -> list[np.ndarray]:
             m[0], m[1], m[2], m[3] = min(m[0], bx[0]), min(m[1], bx[1]), max(m[2], bx[2]), max(m[3], bx[3])
         else:
             merged.append(list(bx))
-    return [mask[b[1]: b[3], b[0]: b[2]] for b in merged]
+    return [mask[b[1] : b[3], b[0] : b[2]] for b in merged]
 
 
 def match_text(mask: np.ndarray, candidates: list[str], sizes=range(9, 50)) -> tuple[str | None, float, int]:
@@ -102,7 +109,7 @@ def match_text(mask: np.ndarray, candidates: list[str], sizes=range(9, 50)) -> t
     ys, xs = np.where(mask)
     if len(ys) < 4:
         return None, 0.0, 0
-    crop = mask[ys.min(): ys.max() + 1, xs.min(): xs.max() + 1]
+    crop = mask[ys.min() : ys.max() + 1, xs.min() : xs.max() + 1]
     h = crop.shape[0]
     comps = _glyph_components(crop)
     cands = [t for t in candidates if len(t.replace(" ", "")) == len(comps)]
@@ -114,9 +121,15 @@ def match_text(mask: np.ndarray, candidates: list[str], sizes=range(9, 50)) -> t
         if abs(_text_mask("0", s).shape[0] - h) > 8:
             continue
         # per-component, per-char IoU
-        ious = [{ch: _iou(g, _text_mask(ch, s)) for ch in alphabet
-                 if abs(_text_mask(ch, s).shape[1] - g.shape[1]) <= 2 and abs(_text_mask(ch, s).shape[0] - g.shape[0]) <= 2}
-                for g in comps]
+        ious = [
+            {
+                ch: _iou(g, _text_mask(ch, s))
+                for ch in alphabet
+                if abs(_text_mask(ch, s).shape[1] - g.shape[1]) <= 2
+                and abs(_text_mask(ch, s).shape[0] - g.shape[0]) <= 2
+            }
+            for g in comps
+        ]
         for t in cands:
             chars = t.replace(" ", "")
             vals = [ious[i].get(c, 0.0) for i, c in enumerate(chars)]
@@ -128,7 +141,7 @@ def match_text(mask: np.ndarray, candidates: list[str], sizes=range(9, 50)) -> t
 
 def _ink(img: np.ndarray, rect: tuple[int, int, int, int], bg: tuple[int, ...]) -> np.ndarray:
     x0, y0, x1, y1 = rect
-    sub = img[max(y0, 0): y1, max(x0, 0): x1].astype(np.int16)
+    sub = img[max(y0, 0) : y1, max(x0, 0) : x1].astype(np.int16)
     diff = np.abs(sub - np.array(bg, np.int16)).max(axis=2)
     if diff.size == 0 or diff.max() < 40:
         return np.zeros(diff.shape, bool)
@@ -148,8 +161,11 @@ def _read_region(img: np.ndarray, rect: tuple[int, int, int, int], bg, candidate
     text, score, size = match_text(mask, candidates)
     ok = text is not None and score >= TOLERANCES["text_iou_min"]
     ys, xs = np.where(mask)
-    box = [int(rect[0] + xs.min()), int(rect[1] + ys.min()), int(rect[0] + xs.max()),
-           int(rect[1] + ys.max())] if len(ys) else None
+    box = (
+        [int(rect[0] + xs.min()), int(rect[1] + ys.min()), int(rect[0] + xs.max()), int(rect[1] + ys.max())]
+        if len(ys)
+        else None
+    )
     return (text if ok else None), round(float(score), 3), box
 
 
@@ -203,9 +219,9 @@ def _read_gauge(img: np.ndarray, circle: tuple[float, float, float], module_fill
     rec: dict[str, Any] = {"center": [round(cx, 1), round(cy, 1)], "radius": round(R, 1), "reasons": []}
     pad = int(R + 4)
     x0, y0 = max(int(cx) - pad, 0), max(int(cy) - pad, 0)
-    sub = img[y0: int(cy) + pad, x0: int(cx) + pad]
+    sub = img[y0 : int(cy) + pad, x0 : int(cx) + pad]
     lcx, lcy = cx - x0, cy - y0
-    yy, xx = np.mgrid[0: sub.shape[0], 0: sub.shape[1]]
+    yy, xx = np.mgrid[0 : sub.shape[0], 0 : sub.shape[1]]
     rr = np.hypot(xx - lcx, yy - lcy)
     face = _mode_color(sub[(rr > 0.2 * R) & (rr < 0.9 * R)])
     rec["face_rgb_bgr"] = list(face)
@@ -245,8 +261,8 @@ def _read_gauge(img: np.ndarray, circle: tuple[float, float, float], module_fill
     needle_rel = (225.0 - needle) % 360.0
     seen = {i for i in seen if abs(i * spacing - needle_rel) > 3.0}
     seen |= {0, n}
-    from math import gcd
     from functools import reduce
+    from math import gcd
 
     ordered = sorted(seen)
     mpm = reduce(gcd, [b - a for a, b in zip(ordered, ordered[1:], strict=False)])
@@ -268,7 +284,9 @@ def _read_gauge(img: np.ndarray, circle: tuple[float, float, float], module_fill
             continue
         px, py = lcx + 0.52 * R * math.cos(math.radians(a)), lcy - 0.52 * R * math.sin(math.radians(a))
         win = np.zeros(ink.shape, bool)
-        win[int(max(py - 0.14 * R, 0)): int(py + 0.14 * R) + 1, int(max(px - 0.30 * R, 0)): int(px + 0.30 * R) + 1] = True
+        win[
+            int(max(py - 0.14 * R, 0)) : int(py + 0.14 * R) + 1, int(max(px - 0.30 * R, 0)) : int(px + 0.30 * R) + 1
+        ] = True
         sel = ink & win & (rr >= 0.32 * R) & (rr <= 0.74 * R)
         if not sel.any():
             continue
@@ -331,7 +349,8 @@ def _read_gauge(img: np.ndarray, circle: tuple[float, float, float], module_fill
     rec["minor_tick_milli"] = minor_milli
     rec["reading_mkpa"] = to_milli_kpa(milli, unit)
     rec["uncertainty_mkpa"] = to_milli_kpa(
-        int(round(TOLERANCES["reading_uncertainty_ticks_snapped"] * minor_milli)), unit)
+        int(round(TOLERANCES["reading_uncertainty_ticks_snapped"] * minor_milli)), unit
+    )
     rec["box"] = [int(cx - R), int(cy - R), int(cx + R), int(cy + R)]
     return rec
 
@@ -364,8 +383,9 @@ def verify_png(png: bytes) -> dict[str, Any]:
         return trace
     h, w = arr.shape[:2]
     trace["image"] = {"width": w, "height": h}
-    frame = np.concatenate([arr[:8].reshape(-1, 3), arr[-8:].reshape(-1, 3),
-                            arr[:, :8].reshape(-1, 3), arr[:, -8:].reshape(-1, 3)])
+    frame = np.concatenate(
+        [arr[:8].reshape(-1, 3), arr[-8:].reshape(-1, 3), arr[:, :8].reshape(-1, 3), arr[:, -8:].reshape(-1, 3)]
+    )
     bg = _mode_color(frame)
     diff = np.abs(arr.astype(np.int16) - np.array(bg, np.int16)).max(axis=2)
     mask = cv2.morphologyEx((diff > 10).astype(np.uint8), cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8))
@@ -377,9 +397,9 @@ def verify_png(png: bytes) -> dict[str, Any]:
         return trace
 
     for mx, my, mw, mh in mods:
-        fill = _mode_color(arr[my + 5: my + mh - 5, mx + 5: mx + mw - 5])
+        fill = _mode_color(arr[my + 5 : my + mh - 5, mx + 5 : mx + mw - 5])
         inner = (mx + 6, my + 6, mx + mw - 6, my + mh - 6)
-        sub = arr[inner[1]: inner[3], inner[0]: inner[2]].astype(np.int16)
+        sub = arr[inner[1] : inner[3], inner[0] : inner[2]].astype(np.int16)
         m2 = (np.abs(sub - np.array(fill, np.int16)).max(axis=2) > 12).astype(np.uint8)
         cs, _ = cv2.findContours(m2, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         gauges, lamps = [], []
@@ -406,8 +426,9 @@ def verify_png(png: bytes) -> dict[str, Any]:
         pump["pump_id"] = title.split()[-1] if title else None
         for gc in gauges:
             gx, gy, gr = gc
-            cap, cscore, _ = _read_region(arr, (int(gx - gr), int(gy + gr + 6), int(gx + gr), int(gy + gr + 44)), fill,
-                                          ["INLET", "OUTLET"])
+            cap, cscore, _ = _read_region(
+                arr, (int(gx - gr), int(gy + gr + 6), int(gx + gr), int(gy + gr + 44)), fill, ["INLET", "OUTLET"]
+            )
             rec = _read_gauge(arr, gc, fill)
             rec["caption"], rec["caption_score"] = cap, cscore
             if cap is None:
@@ -418,19 +439,25 @@ def verify_png(png: bytes) -> dict[str, Any]:
             pump["gauges"][cap] = rec
         for lc in lamps:
             lx, ly, lr = lc
-            cap, cscore, _ = _read_region(arr, (int(lx - 60), int(ly + lr + 4), int(lx + 60), int(ly + lr + 40)), fill,
-                                          ["RUN", "ALARM"])
+            cap, cscore, _ = _read_region(
+                arr, (int(lx - 60), int(ly + lr + 4), int(lx + 60), int(ly + lr + 40)), fill, ["RUN", "ALARM"]
+            )
             if cap is None:
                 pump["reasons"].append("lamp_caption_unreadable")
                 continue
-            patch = arr[int(ly) - 10: int(ly) + 11, int(lx) - 10: int(lx) + 11]
+            patch = arr[int(ly) - 10 : int(ly) + 11, int(lx) - 10 : int(lx) + 11]
             hsv = cv2.cvtColor(patch, cv2.COLOR_BGR2HSV).reshape(-1, 3).mean(axis=0)
             sat, val = float(hsv[1]), float(hsv[2])
             state = "on" if sat >= 110 and val >= 140 else ("off" if sat <= 70 else None)
             if state is None:
                 pump["reasons"].append(f"{cap}:lamp_state_ambiguous")
-            pump["lamps"][cap] = {"state": state, "center": [round(lx, 1), round(ly, 1)],
-                                  "sat": round(sat, 1), "val": round(val, 1), "caption_score": cscore}
+            pump["lamps"][cap] = {
+                "state": state,
+                "center": [round(lx, 1), round(ly, 1)],
+                "sat": round(sat, 1),
+                "val": round(val, 1),
+                "caption_score": cscore,
+            }
         for need in ("INLET", "OUTLET"):
             if need not in pump["gauges"]:
                 pump["reasons"].append(f"missing_gauge_{need}")
@@ -449,9 +476,13 @@ def verify_png(png: bytes) -> dict[str, Any]:
                 pump["reasons"].append(why)
             else:
                 pump["run"], pump["alarm"] = run, alarm
-                pump["derived"] = {"delta_mkpa": delta, "delta_uncertainty_mkpa": u, "state": state,
-                                   "expected_alarm": state == "LOW_PRESSURE",
-                                   "alarm_consistent": alarm == (state == "LOW_PRESSURE")}
+                pump["derived"] = {
+                    "delta_mkpa": delta,
+                    "delta_uncertainty_mkpa": u,
+                    "state": state,
+                    "expected_alarm": state == "LOW_PRESSURE",
+                    "alarm_consistent": alarm == (state == "LOW_PRESSURE"),
+                }
                 pump["verdict"] = "verified"
         trace["pumps"].append(pump)
     n_ok = sum(p["verdict"] == "verified" for p in trace["pumps"])

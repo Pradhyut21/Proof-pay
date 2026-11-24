@@ -1,0 +1,85 @@
+{
+  "accepted_answerable_tasks": 591,
+  "accepted_base_groups": 75,
+  "accepted_variants": 154,
+  "attempts": 250,
+  "audit_status": {
+    "human_audit_planned": 50,
+    "human_reviewed": 0,
+    "inter_reviewer_agreement": null,
+    "note": "No human review has been performed; the worksheet is prepared only.",
+    "reviewers": 0
+  },
+  "category_balance": {
+    "consistency": {
+      "CONSISTENT": 92,
+      "INCONSISTENT": 88
+    },
+    "state": {
+      "LOW_PRESSURE": 70,
+      "NORMAL": 67,
+      "STOPPED": 62
+    }
+  },
+  "dataset_version": "0.1.0",
+  "diagnostics": 40,
+  "distinct_scenes": 189,
+  "groups": 75,
+  "layout_families": {
+    "1p-single": 275,
+    "2p-rows": 316
+  },
+  "manifest_sha256": "1a4d534ea75c32e51f7a5459d3aa914ac26034170218799a23ad35c573ac2903",
+  "pair_members_by_variant": {
+    "nuisance": 50,
+    "preserving": 32,
+    "semantic": 146
+  },
+  "pairs": 114,
+  "rejections": {
+    "INLET:numerals_unreadable": 2,
+    "make_missing:no_valid_edit": 13,
+    "make_preserving:no_valid_edit": 3,
+    "make_semantic_flip:no_valid_edit": 2
+  },
+  "shortfalls": {},
+  "skills": {
+    "C": 80,
+    "M": 231,
+    "R": 100,
+    "X": 180
+  },
+  "split_units": {
+    "counts": {
+      "dev": 15,
+      "frozen_heldout_style": 18,
+      "frozen_main": 42
+    },
+    "groups": 75,
+    "near_duplicate_pairs_merged": 0,
+    "split_units": 75
+  },
+  "splits": {
+    "dev": 15,
+    "frozen_heldout_style": 18,
+    "frozen_main": 42
+  },
+  "targets": {
+    "C": 80,
+    "M": 150,
+    "R": 100,
+    "X": 100,
+    "diagnostics": 40,
+    "pairs": 50,
+    "total": 500
+  },
+  "themes": {
+    "daylight": 145,
+    "sand": 145,
+    "slate": 148,
+    "teal": 153
+  },
+  "yield": {
+    "base_accepted_over_attempted": 0.469
+  }
+}
