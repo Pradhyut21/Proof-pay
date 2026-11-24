@@ -10,13 +10,13 @@
 | Leakage control | Group splits; zero cross-split seeds, groups, images; public files carry no private fields (audited) | Verified by `audit-dataset` |
 | Independent solver | Rust oracle vs Python rules, 1000 scenes, 0 mismatches | Verified (WSL Linux) |
 | Independent reading | Raster verifier uses PNG only | Verified internally; same repository, not an outside reader |
-| Perturbation robustness | `docs/results/perturbation.json` | **Weak**: below 95% agreement on 6 of 8 perturbations; no false accepts |
+| Perturbation robustness | `docs/results/perturbation.json` | Clean-render scope. Rotation and noise yielded 0 recoveries in the 30-scene study; no false accepts were observed |
 | Shortcut resistance | Answer-class audit | **Weak** for X tasks (28 pp ALARM shift); state tasks pass (1.3 pp) |
 | Human validation | 50-task worksheet | **Not done**: zero reviewers |
 | Model results | Offline mock only, labelled DEMO ONLY | **Not done**: no live model run |
 | API and app | Smoke steps and Playwright flow | Verified locally; no hosted deployment |
-| Platform coverage | Windows (native Python/Node, Rust via WSL), Linux (WSL) | macOS, native Windows Rust, Docker/Compose **not run** |
-| Licensing | `LICENSE` is an MIT placeholder; font license not independently verified | **Open** |
+| Platform coverage | Native Windows Python, Node and Rust; Linux CI | [Platform workflow](../.github/workflows/platform-checks.yml) records macOS core checks and Compose build/startup |
+| Licensing | Code under existing MIT file; bundled Aileron identified and publisher terms recorded | Generated dataset terms remain a team decision |
 
 ## Five ranked fixes
 
