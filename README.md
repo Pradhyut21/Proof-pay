@@ -56,4 +56,15 @@ If Cargo uses a custom target directory, pass the built `pp` binary path to the 
 
 ## Current status
 
-The dataset, verifier, API, scorer and web app run end to end on synthetic data, and everything under `docs/results/` is reproducible from this repository. **No live model has been evaluated**; all model outputs in reports are DEMO ONLY mock outputs. No human has reviewed the tasks. Known weaknesses (an ALARM-lamp shortcut in consistency tasks, a verifier that is brittle under image perturbation, two layout families) are listed in [`docs/judge_audit.md`](docs/judge_audit.md). The frozen evaluation needs authorized model access.
+The renderer, independent verifier, scorer, API and web app run end to end on generated synthetic panels. The published examples and historical reports support reproducibility. Model fixture outputs carry **DEMO ONLY** labels. Human review and authorized provider evaluation remain pending. The [judge audit](docs/judge_audit.md) records the historical ALARM cue imbalance, perturbation sensitivity and two-layout scope.
+
+### Build a private evaluation holdout
+
+Keep a random 64-character hexadecimal seed in a local file outside Git. Use a new output folder outside Git for the generated holdout and keep the seed, answers and private artifacts there.
+
+```sh
+uv run --project python --python 3.11 --locked python -m panelproof.cli build-dataset --config configs/benchmark.yaml --out /local/holdout --holdout-seed-file /local/seed.txt
+uv run --project python --python 3.11 --locked python -m panelproof.cli audit-dataset --dataset /local/holdout --rebuild-config configs/benchmark.yaml --holdout-seed-file /local/seed.txt
+```
+
+Without a seed file, the same builder produces a public reproducibility build. Both modes run the real generation and validation pipeline. The holdout manifest records its role and hashes for measured reporting. [Evaluation conditions and authorization](evals/conditions.md)

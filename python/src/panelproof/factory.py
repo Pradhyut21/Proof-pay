@@ -11,7 +11,6 @@ from __future__ import annotations
 import hashlib
 import json
 import random
-import shutil
 from pathlib import Path
 from typing import Any
 
@@ -61,8 +60,8 @@ def run_factory(seed: str, count: int, out: Path, difficulty: str = "medium") ->
     if difficulty not in PROFILES:
         raise ValueError(f"difficulty must be one of {sorted(PROFILES)}")
     cfg = {**load_config(), **PROFILES[difficulty]}
-    if out.exists():
-        shutil.rmtree(out)
+    if out.is_symlink() or (out.exists() and (not out.is_dir() or any(out.iterdir()))):
+        raise ValueError("factory output must be a new or empty directory")
     (out / "images").mkdir(parents=True)
     tasks: list[dict[str, Any]] = []
     contract: list[dict[str, Any]] = []
@@ -156,8 +155,20 @@ def run_factory(seed: str, count: int, out: Path, difficulty: str = "medium") ->
                 continue
             nui = make_nuisance(base, rng)
             vn = _verified(nui.scene) if nui else None
-            kind = "state" if i % 2 == 0 else "consistency"
             pid = sem.pump_id
+            originals = {q.kind: q.answer for q in build_questions(base) if q.pump_id == pid}
+            mutations = {q.kind: q.answer for q in build_questions(sem.scene) if q.pump_id == pid}
+            preferred = ("state", "consistency") if i % 2 == 0 else ("consistency", "state")
+            kind = next(
+                (
+                    k for k in preferred
+                    if k in originals and k in mutations and not answers_agree(originals[k], mutations[k])
+                ),
+                None,
+            )
+            if kind is None:
+                skipped += 1
+                continue
             tb = emit(base, *vb, pid, kind, "base", None)
             ts = emit(sem.scene, *vs, pid, kind, "semantic", None)
             pairs.append({"pair_id": "p_" + _hid(seed, str(i), "sem"), "task_ids": [tb, ts]})

@@ -18,13 +18,16 @@ import hashlib
 import json
 import math
 import random
+import re
 from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
 
 from .question_bridge import score_answer
+from .scene import canonical_json
 
 CORE_CONDITIONS = ("C0", "C1", "C3")
+FROZEN_SPLITS = ("frozen_main", "frozen_heldout_style")
 OK_STATUS = "ok"
 FAILURE_STATUSES = ("parse_error", "provider_error", "timeout", "refusal")
 BOOTSTRAP_REPS = 1000
@@ -47,12 +50,80 @@ def selection_hash(task_ids: list[str], conditions: list[str]) -> str:
     return h.hexdigest()
 
 
+def _holdout_digest(manifest: dict[str, Any] | None) -> str:
+    if not isinstance(manifest, dict) or manifest.get("dataset_purpose") != "measured_holdout":
+        raise PermissionError("measured report requires a private holdout manifest")
+    commitment = manifest.get("seed_commitment_sha256")
+    if not isinstance(commitment, str) or not re.fullmatch(r"[a-f0-9]{64}", commitment):
+        raise PermissionError("measured report requires the private holdout seed commitment")
+    body = {key: value for key, value in manifest.items() if key != "manifest_sha256"}
+    digest = hashlib.sha256(canonical_json(body)).hexdigest()
+    if manifest.get("manifest_sha256") != digest:
+        raise PermissionError("measured report manifest checksum does not match its contents")
+    return digest
+
+
 def require_freeze(manifest: dict[str, Any] | None, approval: dict[str, Any] | None, sel_hash: str) -> None:
-    """Measured runs only after dataset freeze and recorded access approval."""
-    if not manifest or "manifest_sha256" not in manifest:
-        raise PermissionError("measured run refused: no frozen dataset manifest")
-    if not approval or approval.get("selection_hash") != sel_hash or not approval.get("approved_by"):
-        raise PermissionError("measured run refused: no recorded access approval for this selection hash")
+    """Require a private holdout and approval bound to its checksum and the task selection."""
+    digest = _holdout_digest(manifest)
+    approved_by = approval.get("approved_by") if isinstance(approval, dict) else None
+    if (
+        not isinstance(approved_by, str)
+        or not approved_by.strip()
+        or approval.get("selection_hash") != sel_hash
+        or approval.get("manifest_sha256") != digest
+    ):
+        raise PermissionError("measured report requires recorded approval for this holdout and selection")
+
+
+def _measured_provenance(
+    tasks: dict[str, dict[str, Any]],
+    attempts: list[dict[str, Any]],
+    manifest: dict[str, Any],
+    approval: dict[str, Any] | None,
+    split: str,
+) -> dict[str, Any]:
+    if not attempts:
+        raise PermissionError("measured report requires nonempty model attempts")
+    selected_splits = set(split.split(","))
+    by_model: dict[tuple[str, str, str], dict[str, set[str]]] = defaultdict(lambda: defaultdict(set))
+    run_ids: dict[tuple[str, str, str], set[str]] = defaultdict(set)
+    for attempt in attempts:
+        tid = attempt["task_id"]
+        task = tasks.get(tid)
+        if not task or task["set"] != "main" or task["split"] not in selected_splits:
+            raise PermissionError("measured attempts must use the selected frozen answerable tasks")
+        model = (attempt["provider"], attempt["model"], attempt["model_revision"])
+        condition = attempt["condition"]
+        ids = by_model[model][condition]
+        if condition not in CORE_CONDITIONS or tid in ids or attempt["mock"]:
+            raise PermissionError("measured report refuses duplicate, mock or unsupported-condition attempts")
+        ids.add(tid)
+        run_ids[model].add(attempt["run_id"])
+    if len({model[1] for model in by_model}) != len(by_model):
+        raise PermissionError("measured report cannot mix provider identities or revisions for one model ID")
+    identities = [
+        {"provider": model[0], "model_id": model[1], "model_revision": model[2]} for model in sorted(by_model)
+    ]
+    approved_models = approval.get("models") if isinstance(approval, dict) else None
+    if (
+        not isinstance(approved_models, list)
+        or len(approved_models) != len(identities)
+        or any(model not in approved_models for model in identities)
+    ):
+        raise PermissionError("measured report requires approval for the exact provider, model and revision set")
+    for by_condition in by_model.values():
+        first = next(iter(by_condition.values()))
+        if not first or any(ids != first for ids in by_condition.values()):
+            raise PermissionError("measured report requires the same nonempty task selection for every condition")
+        require_freeze(manifest, approval, selection_hash(list(first), list(by_condition)))
+    return {
+        "dataset_manifest_sha256": manifest["manifest_sha256"],
+        "selection_hash": approval["selection_hash"],
+        "models": [
+            {**identity, "run_ids": sorted(run_ids[key])} for identity, key in zip(identities, sorted(by_model), strict=True)
+        ],
+    }
 
 
 # ------------------------------------------------------------------ aggregation
@@ -85,8 +156,9 @@ def summarize(rows: list[dict[str, Any]]) -> dict[str, Any]:
 def _pairs(rows: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
     by: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for r in rows:
-        if r.get("pair_id"):
-            by[r["pair_id"] + "|" + r["kind"]].append(r)
+        ids = r.get("pair_ids") or ([r["pair_id"]] if r.get("pair_id") else [])
+        for pair in ids:
+            by[pair + "|" + r["kind"]].append(r)
     return by
 
 
@@ -225,6 +297,7 @@ def build_report(
                     k: t[k]
                     for k in ("skill", "kind", "difficulty", "group_id", "pair_id", "variant_kind", "answer", "split")
                 },
+                "pair_ids": t.get("pair_ids", []),
                 "task_id": a["task_id"],
                 "model": a["model"],
                 "condition": a["condition"],
@@ -240,7 +313,7 @@ def build_report(
     models = sorted({r["model"] for r in scored})
     # matched selection: tasks that have an attempt row for every compared core condition for that model
     report: dict[str, Any] = {
-        "banner": "DEMO ONLY - mock outputs, not a measurement" if mock else "MEASURED",
+        "banner": "DEMO ONLY - mock outputs, not a measurement" if mock else "DEVELOPMENT - unapproved report",
         "mock": mock,
         "dataset_split": split,
         "conditions": list(conditions),
@@ -297,9 +370,12 @@ def build_report(
 # ------------------------------------------------------------------ IO
 
 
-def load_tasks(root: Path) -> dict[str, dict[str, Any]]:
+def load_tasks(root: Path, *, expected_sha256: str | None = None) -> dict[str, dict[str, Any]]:
     path = root / "private" / "answers.jsonl"
-    return {r["task_id"]: r for r in (json.loads(x) for x in path.read_text(encoding="utf-8").splitlines())}
+    data = path.read_bytes()
+    if expected_sha256 is not None and hashlib.sha256(data).hexdigest() != expected_sha256:
+        raise PermissionError("private answers do not match the holdout manifest")
+    return {r["task_id"]: r for r in (json.loads(x) for x in data.decode().splitlines())}
 
 
 def load_attempts(path: Path) -> list[dict[str, Any]]:
@@ -308,6 +384,16 @@ def load_attempts(path: Path) -> list[dict[str, Any]]:
 
 def render_markdown(rep: dict[str, Any]) -> str:
     L = [f"# PanelProof run report - {rep['banner']}", ""]
+    if provenance := rep.get("provenance"):
+        L += [
+            f"Holdout manifest SHA-256 `{provenance['dataset_manifest_sha256']}`",
+            f"Selection SHA-256 `{provenance['selection_hash']}`",
+            "",
+        ]
+        for model in provenance["models"]:
+            runs = ", ".join(f"`{run_id}`" for run_id in model["run_ids"])
+            L.append(f"- `{model['provider']}/{model['model_id']}` at `{model['model_revision']}`, runs {runs}")
+        L.append("")
     if rep["mock"]:
         L += [
             "> **DEMO ONLY.** These outputs come from the offline mock adapter. They demonstrate the report format "
@@ -381,7 +467,7 @@ def render_markdown(rep: dict[str, Any]) -> str:
 def main_metrics(argv: list[str]) -> int:
     ap = argparse.ArgumentParser(prog="panelproof metrics")
     ap.add_argument("--tasks", required=True, help="dataset directory built by build-dataset")
-    ap.add_argument("--attempts", required=True, help="attempts JSONL")
+    ap.add_argument("--attempts", required=True, action="append", help="attempts JSONL; repeat for multiple runs")
     ap.add_argument("--out", required=True)
     ap.add_argument(
         "--split", default=None, help="comma list of splits to include, e.g. dev or frozen_main,frozen_heldout_style"
@@ -394,17 +480,36 @@ def main_metrics(argv: list[str]) -> int:
     )
     ap.add_argument("--rust-pp", default=None, help="path to the Rust `pp` binary: cross-check scoring against it")
     ap.add_argument("--measured", action="store_true", help="require dataset freeze + access approval")
-    ap.add_argument("--approval", default=None, help="JSON with selection_hash and approved_by (measured runs only)")
+    ap.add_argument("--approval", default=None, help="approval JSON for the holdout, selection and pinned models")
     a = ap.parse_args(argv)
     root = Path(a.tasks)
-    tasks = load_tasks(root)
+    manifest = approval = None
+    expected_answers = None
+    if a.measured:
+        if a.attempt_format != "contract":
+            raise PermissionError("measured report requires contract attempts with adjacent run manifests")
+        manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+        _holdout_digest(manifest)
+        commitments = manifest.get("private_commitments")
+        expected_answers = commitments.get("private/answers.jsonl") if isinstance(commitments, dict) else None
+        if not isinstance(expected_answers, str) or not re.fullmatch(r"[a-f0-9]{64}", expected_answers):
+            raise PermissionError("measured report requires a commitment for private answers")
+        approval = json.loads(Path(a.approval).read_text(encoding="utf-8")) if a.approval else None
+        a.split = a.split or ",".join(FROZEN_SPLITS)
+        if not set(a.split.split(",")).issubset(FROZEN_SPLITS):
+            raise PermissionError("measured report requires frozen splits")
+    tasks = load_tasks(root, expected_sha256=expected_answers)
     if a.attempt_format == "contract":
         from .contract_attempts import load_contract_attempts
 
-        attempts = load_contract_attempts(Path(a.attempts))
+        attempts = [row for path in a.attempts for row in load_contract_attempts(Path(path), measured=a.measured)]
     else:
-        attempts = load_attempts(Path(a.attempts))
+        attempts = [row for path in a.attempts for row in load_attempts(Path(path))]
+    provenance = _measured_provenance(tasks, attempts, manifest, approval, a.split) if a.measured else None
     rep = build_report(tasks, attempts, split=a.split)
+    if provenance:
+        rep["banner"] = "MEASURED"
+        rep["provenance"] = provenance
     if a.rust_pp:
         from .contract_attempts import rust_parity
 
@@ -412,13 +517,6 @@ def main_metrics(argv: list[str]) -> int:
         rep["rust_scoring_parity"] = parity if parity is not None else {"status": "not run: pp binary not found"}
         if parity and parity["mismatch_count"]:
             raise RuntimeError(f"Rust scorer disagrees on {parity['mismatch_count']} attempts: {parity['mismatches'][:3]}")
-    if a.measured:
-        manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
-        approval = json.loads(Path(a.approval).read_text(encoding="utf-8")) if a.approval else None
-        for m in rep["models"].values():
-            require_freeze(manifest, approval, m["selection_hash"])
-        if rep["mock"]:
-            raise PermissionError("measured report refused: attempts are mock/DEMO ONLY")
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
     (out / "report.json").write_text(json.dumps(rep, indent=2, sort_keys=True) + "\n", encoding="utf-8")

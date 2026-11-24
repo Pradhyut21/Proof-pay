@@ -3,8 +3,8 @@
 panelproof generate --seed S --count N --out DIR [--config C] [--workers W] [--preview]
 panelproof verify   --dataset DIR [--out FILE]
 panelproof variants --dataset DIR
-panelproof build-dataset --config configs/benchmark.yaml --out DIR
-panelproof audit-dataset --dataset DIR
+panelproof build-dataset --config configs/benchmark.yaml --out DIR [--holdout-seed-file FILE]
+panelproof audit-dataset --dataset DIR [--rebuild-config CONFIG] [--holdout-seed-file FILE]
 panelproof metrics --tasks DIR --attempts FILE --out DIR
 """
 
