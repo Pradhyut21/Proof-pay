@@ -1,6 +1,6 @@
 # Three-minute PanelProof demo
 
-Before rehearsing, record the verified release SHA, generation command or UI path, seed, sample IDs, and runnable fallback. Have one validated semantic pair and one nuisance pair ready. Bring the actual validation and model report files if they are available. Use a clearly labeled offline fixture for a rehearsal that precedes those artifacts.
+Before rehearsing, record the verified release SHA and keep its source manifest beside the browser. Use `judge-rehearsal` as the Task Factory seed with two panels. The checked-in Model Arena sample below is the fallback if generation takes longer than the allotted time.
 
 | Time | Show | Say |
 | --- | --- | --- |
@@ -10,6 +10,16 @@ Before rehearsing, record the verified release SHA, generation command or UI pat
 | 1:25–2:05 | Reveal the independently measured pixel evidence and rule verdict for a validated sample. | The verifier recovers readings from the raster and checks the verdict. Show how one reading, its uncertainty, and its instrument label support this answer. |
 | 2:05–2:40 | Open the actual frozen report, or a clearly labeled offline demo fixture for rehearsal. | Show one measured success and one failure if available. Point to sample counts and how invalid responses or provider failures affect each accuracy denominator. |
 | 2:40–3:00 | Show the release source SHA, manifest, and reproduction instructions. | These artifacts identify the source and benchmark inputs for reruns. State the remaining simulation and model-access limits. |
+
+## Arena sample and inspector
+
+| Step | Public demo ID | What to point out |
+| --- | --- | --- |
+| Semantic comparison | `p_784449ff7096f562` | PUMP A outlet stays at 600 kPa. Inlet moves from 40 to 500 kPa, so the pressure difference crosses the 300 kPa threshold and the state changes from NORMAL to LOW_PRESSURE. |
+| Nuisance comparison | `p_114a1f1fc1ae6b9c` | The text shrinks. PUMP A's needles and lamps stay the same, so its state stays NORMAL. |
+| Evidence Inspector | `t_4ca4005a1f640860` | Select the base task and click **Reveal evidence**. Point to the raster readings and diagram regions supporting the answer. |
+
+Open **Run Reports** using the locally generated aggregates. The offline report is labeled **DEMO ONLY**. Keep the artifact used by the view alongside the release notes. The [reproduction commands](../README.md#quickstart) generate the report locally.
 
 ## Five slides
 

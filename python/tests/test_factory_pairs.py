@@ -1,3 +1,4 @@
+import hashlib
 import json
 
 import pytest
@@ -27,6 +28,16 @@ def test_factory_exports_only_answer_flipping_semantic_pairs(tmp_path):
         else:
             assert before["answer"] == after["answer"]
     assert semantic == 4
+    keys_bytes = (output / "private" / "keys.jsonl").read_bytes()
+    manifest = json.loads((output / "manifest.json").read_bytes())
+    assert b"\r\n" not in keys_bytes
+    assert manifest["files"]["private/keys.jsonl"] == hashlib.sha256(keys_bytes).hexdigest()
+    for key in map(json.loads, keys_bytes.splitlines()):
+        assert set(key["generator_readings"]) == {"INLET", "OUTLET"}
+        for role, reading in key["generator_readings"].items():
+            assert reading["unit"] == key["validation"]["readings"][role]["unit"]
+            assert reading["value_milli"] == key["validation"]["readings"][role]["reading_milli"]
+    assert b"generator_readings" not in (output / "public" / "tasks.jsonl").read_bytes()
 
 
 def test_factory_preserves_a_nonempty_output_directory(tmp_path):
