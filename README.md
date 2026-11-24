@@ -15,7 +15,7 @@ Requirements: Rust stable, Python 3.11+ with [uv](https://docs.astral.sh/uv/), N
 ./run.sh web             # terminal 2: web app on http://127.0.0.1:3000
 ```
 
-Open `/factory` to build a small dataset and `/arena` to answer tasks and reveal answers. The reveal token is read from `PANELPROOF_REVEAL_TOKEN` (the scripts default to a local development value) and stays on the server.
+Open `/factory` to build a small dataset and `/arena` to answer tasks and reveal answers. The reveal token stays on the server. The scripts use a local development default. Set a fresh random `PANELPROOF_REVEAL_TOKEN` in the deployment environment before exposing a demo beyond loopback.
 
 | Command | What it does |
 | --- | --- |

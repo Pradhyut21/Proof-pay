@@ -33,7 +33,7 @@ def source(tmp_path):
         "infra/docker/api.Dockerfile": "FROM debian:bookworm-slim\n",
         "infra/docker/web.Dockerfile": "FROM node:22-bookworm-slim\n",
         "python/src/panelproof.py": "def status():\n    return 'ready'\n",
-        ".env.example": "MODEL_API_KEY=REPLACE_WITH_KEY\n",
+        ".env.example": "PANELPROOF_REVEAL_TOKEN=\n# Optional settings\nMODEL_API_KEY=REPLACE_WITH_KEY\n",
         ".env": "MODEL_API_KEY=fixture-redacted-secret\n",
         "datasets/external/gauge.json": '{"external":true}',
         "data/demo/private/keys.jsonl": '{"answer":true}',
@@ -116,3 +116,16 @@ def test_rejects_suspect_source_without_echoing_content(source, tmp_path):
     run = invoke(source, out)
     assert run.returncode == 2 and not out.exists()
     assert "possible credential material" in run.stderr and secret not in run.stderr
+
+
+def test_rejects_nonplaceholder_env_values_after_blank_settings(source, tmp_path):
+    secret = "staged-local-only-value"
+    (source / ".env.example").write_text(
+        f"PANELPROOF_REVEAL_TOKEN=\nMODEL_API_KEY={secret}\n", encoding="utf-8"
+    )
+    git(source, "add", ".env.example")
+    git(source, "commit", "-m", "nonplaceholder fixture")
+    out = tmp_path / "release"
+    run = invoke(source, out)
+    assert run.returncode == 2 and not out.exists()
+    assert "must use placeholders" in run.stderr and secret not in run.stderr

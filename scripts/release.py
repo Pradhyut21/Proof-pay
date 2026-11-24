@@ -122,7 +122,7 @@ SECRET_SIGNATURE = re.compile(
     rb"github_pat_[A-Za-z0-9_]{30,}|AKIA[A-Z0-9]{16})"
 )
 ENV_SECRET = re.compile(
-    rb"^\s*(?:export\s+)?[A-Za-z0-9_]*(?:API_KEY|TOKEN|PASSWORD|SECRET)\s*=\s*([^\r\n]*)",
+    rb"^[ \t]*(?:export[ \t]+)?[A-Za-z0-9_]*(?:API_KEY|TOKEN|PASSWORD|SECRET)[ \t]*=[ \t]*([^\r\n]*)",
     re.MULTILINE,
 )
 WINDOWS_DEVICE = re.compile(
