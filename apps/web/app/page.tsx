@@ -26,7 +26,8 @@ export default function HomePage() {
       <p className="max-w-3xl">
         Read synthetic water-pump control panels, apply the public rules, and compare your answers
         with offline demo model outputs. Generate new tasks in the Task Factory, or open the Model
-        Arena to compare counterfactual pairs.
+        Arena to compare counterfactual pairs. Use the Evidence Inspector to check an authorized
+        reveal and Run Reports to review the evaluation metrics.
       </p>
       <Card aria-labelledby="status-h" className="space-y-2">
         <h2 id="status-h" className="text-lg font-semibold">

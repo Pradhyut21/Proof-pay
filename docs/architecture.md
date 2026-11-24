@@ -24,13 +24,14 @@ configs/*.yaml ──► Python factory ──► dataset bundle ──► Rust 
 | Metrics | `metrics.py`, `contract_attempts.py` | Matched C0/C1/C3 conditions, cluster bootstrap, parity with the Rust scorer |
 | Oracle and scoring | `crates/{oracle,scoring}` | Independent Rust solver and the `pp` scorer |
 | API | `crates/api` | Public task projection, token-protected reveal, idempotent attempts |
-| Web | `apps/web` | Same-origin proxy to the API (the reveal token never reaches the browser), Task Factory, Arena |
+| Web | `apps/web` | Same-origin API proxy, Task Factory, Arena, Evidence Inspector and Run Reports |
 
 ## Trust boundaries
 
 - Public records carry only `task_id`, `image_path`, `question`, `public_rules` and `response_schema`. Seeds, answers and evidence boxes live under `private/`.
 - The reveal token is read from `PANELPROOF_REVEAL_TOKEN` by the Next.js server (`apps/web/lib/server/config.ts`) and by the API. It is never sent to client code.
 - Task Factory jobs run on the Next.js server (`apps/web/lib/server/jobs.ts`) and shell out to `panelproof-cli`. This is an interim runner (see *Known gaps*).
+- The Inspector reads the task's manifest-pinned raster data after the Axum reveal succeeds for the same demo task or active Factory job. Its response contains the reference and the displayed measurements. Run Reports reads a server-selected directory of aggregate reports and exports an allowlisted projection.
 
 ## Extending
 

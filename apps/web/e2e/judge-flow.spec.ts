@@ -1,5 +1,9 @@
 import { expect, test } from "@playwright/test";
 
+const semanticPair = "p_784449ff7096f562";
+const nuisancePair = "p_114a1f1fc1ae6b9c";
+const baseTask = "t_4ca4005a1f640860";
+
 test("judge flow: generate -> view -> answer -> compare -> reveal", async ({ page }) => {
   // Overview shows the API is up.
   await page.goto("/");
@@ -7,7 +11,7 @@ test("judge flow: generate -> view -> answer -> compare -> reveal", async ({ pag
 
   // Generate with the real Python worker and serve the result from Axum.
   await page.goto("/factory");
-  await page.getByLabel("Seed").fill("e2e-judge");
+  await page.getByLabel("Seed").fill("judge-rehearsal");
   await page.getByLabel(/Number of panels/).fill("2");
   await page.getByRole("button", { name: "Generate" }).click();
   await expect(page.getByTestId("run-status")).toContainText("Succeeded", { timeout: 90_000 });
@@ -19,16 +23,44 @@ test("judge flow: generate -> view -> answer -> compare -> reveal", async ({ pag
   await page.getByRole("button", { name: "Submit answer" }).first().click();
   await expect(page.getByRole("alert").first()).toBeVisible();
 
+  await page.getByRole("link", { name: "Inspect evidence" }).first().click();
+  await page.getByRole("button", { name: "Reveal evidence" }).click();
+  await expect(page.getByTestId("inspector-raster-status")).toBeVisible();
+  await expect(page.getByRole("columnheader", { name: "Generator reading" })).toBeVisible();
+  await expect(page.getByTestId("raster-evidence-box")).toHaveCount(2);
+  if (process.env.PANELPROOF_RUST_PP) {
+    await expect(
+      page.getByText("The independent Rust rule result agrees with Python."),
+    ).toBeVisible();
+  }
+
   // Counterfactual pair compare + a human attempt + reveal.
   await page.goto("/arena");
+  const pair = page.getByLabel("Counterfactual pair");
+  await pair.selectOption(semanticPair);
   await expect(page.getByTestId("variant-compare").locator("figure")).toHaveCount(2);
   await page.getByRole("radio").first().check();
   await page.getByRole("button", { name: "Submit answer" }).first().click();
   await expect(page.locator('[data-testid^="outcome-"]').first()).toBeVisible();
   await expect(page.getByText(/DEMO ONLY/).first()).toBeVisible();
   await page.getByRole("button", { name: /Reveal answers/ }).click();
-  await expect(page.getByTestId("revealed-answer")).toHaveCount(2);
+  await expect(page.getByTestId("revealed-answer")).toHaveText([
+    "Correct answer: NORMAL",
+    "Correct answer: LOW_PRESSURE",
+  ]);
   await expect(page.getByTestId("evidence-box").first()).toBeVisible();
+
+  await pair.selectOption(nuisancePair);
+  await expect(page.getByTestId("variant-compare").locator("img").nth(1)).toHaveAttribute(
+    "src",
+    /t_aec6e6e45eb47f85\/image$/,
+  );
+  await expect(page.getByTestId("revealed-answer")).toHaveCount(0);
+  await page.getByRole("button", { name: /Reveal answers/ }).click();
+  await expect(page.getByTestId("revealed-answer")).toHaveText([
+    "Correct answer: NORMAL",
+    "Correct answer: NORMAL",
+  ]);
 
   // Mobile viewport: no horizontal overflow.
   await page.setViewportSize({ width: 375, height: 812 });
@@ -36,6 +68,47 @@ test("judge flow: generate -> view -> answer -> compare -> reveal", async ({ pag
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
   );
   expect(overflow).toBeLessThanOrEqual(0);
+});
+
+test("inspector keeps a real panel's evidence hidden until reveal", async ({ page }) => {
+  await page.goto("/inspector");
+  await expect(page.getByRole("heading", { name: "Evidence Inspector" })).toBeVisible();
+  await page.getByLabel("Task", { exact: true }).selectOption(baseTask);
+  await expect(page.getByTestId("evidence-box")).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Reference answer" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Reveal evidence" }).click();
+  await expect(page.getByRole("heading", { name: "Reference answer" })).toBeVisible();
+  await expect(page.getByTestId("evidence-box").first()).toBeVisible();
+  await expect(page.getByText("Raster verification", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("inspector-raster-status")).toBeVisible();
+});
+
+test("inspector surfaces reveal refusal without drawing evidence", async ({ page }) => {
+  await page.route("**/inspector/evidence?*", (route) => route.fulfill({ status: 403 }));
+  await page.goto("/inspector");
+  await page.getByRole("button", { name: "Reveal evidence" }).click();
+  await expect(page.getByRole("main").getByRole("alert")).toContainText("refused evidence");
+  await expect(page.getByTestId("evidence-box")).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Reference answer" })).toHaveCount(0);
+});
+
+test("run reports displays and exports the local offline metrics", async ({ page, request }) => {
+  test.skip(
+    !process.env.PANELPROOF_REPORT_ROOT,
+    "Provide a generated report for this browser check.",
+  );
+  await page.goto("/reports");
+  await expect(page.getByRole("heading", { name: "Run Reports" })).toBeVisible();
+  await expect(page.getByText("DEMO ONLY", { exact: true })).toBeVisible();
+  await expect(page.getByRole("table", { name: "Condition scores" })).toBeVisible();
+  await page.getByRole("combobox", { name: /Condition/ }).selectOption("C1");
+  await page.getByRole("button", { name: "Apply filters" }).click();
+  await expect(page.getByRole("row", { name: /C1 · Full panel/ })).toBeVisible();
+  await expect(page.getByRole("row", { name: /C0 · Text only/ })).toHaveCount(0);
+  const link = await page.getByRole("link", { name: "Download report" }).getAttribute("href");
+  const response = await request.get(link!);
+  expect(response.ok()).toBeTruthy();
+  expect(await response.json()).toMatchObject({ status: "demo" });
 });
 
 test("offline state is explicit when the API is unreachable", async ({ page }) => {

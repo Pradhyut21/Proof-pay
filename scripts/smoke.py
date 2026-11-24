@@ -184,7 +184,7 @@ def main() -> int:
                     env = {**os.environ, "PP_API_DEMO": base, "PANELPROOF_REVEAL_TOKEN": TOKEN, "PP_DEMO_DIR": str(fac)}
                     procs.append(subprocess.Popen([pnpm, "exec", "next", "start", "-H", "127.0.0.1", "-p", str(wport)], cwd=web, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
                     up = wait_for(f"http://127.0.0.1:{wport}/", 60)
-                    urls = ("/", "/factory", "/arena", "/api/pp/demo/healthz", "/api/extras/demo/pairs")
+                    urls = ("/", "/factory", "/arena", "/inspector", "/reports", "/api/pp/demo/healthz", "/api/extras/demo/pairs")
                     codes = {p: code_of("GET", f"http://127.0.0.1:{wport}{p}") for p in urls} if up else {}
                     step("web pages and same-origin proxy respond", "pass" if up and all(v == 200 for v in codes.values()) else "fail", json.dumps(codes))
             else:

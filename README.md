@@ -15,7 +15,11 @@ Requirements: Rust stable, Python 3.11+ with [uv](https://docs.astral.sh/uv/), N
 ./run.sh web             # terminal 2: web app on http://127.0.0.1:3000
 ```
 
-Open `/factory` to build a small dataset and `/arena` to answer tasks and reveal answers. The reveal token stays on the server. The scripts use a local development default. Set a fresh random `PANELPROOF_REVEAL_TOKEN` in the deployment environment before exposing a demo beyond loopback.
+Open `/factory` to build a small dataset and `/arena` to answer tasks and compare pairs. Use `/inspector` to reveal the local reference answer, annotated regions and recovered raster readings. Fresh Factory results also show generator readings alongside the raster values. The reveal token stays on the server. The scripts use a local development default. Set a fresh random `PANELPROOF_REVEAL_TOKEN` in the deployment environment before exposing a demo beyond loopback.
+
+To include independent Rust rule agreement in a fresh Factory bundle, build `pp` with `cargo build --locked -p panelproof-scoring --bin pp` and set `PANELPROOF_RUST_PP` to its absolute executable path before starting the web server.
+
+Run `./run.sh reproduce` or `.\run.ps1 reproduce` to generate a **DEMO ONLY** aggregate report, then open `/reports`. Run Reports loads `data/build/demo_report/report.json` by default. Set `PANELPROOF_REPORT_ROOT` on the web server to read a different local report folder. The folder can contain one `report.json` directly or named subdirectories with their own `report.json` files. The view exports aggregate results and measured provenance where available.
 
 | Command | What it does |
 | --- | --- |

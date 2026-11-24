@@ -9,6 +9,8 @@ const NAV = [
   { href: "/", label: "Overview" },
   { href: "/factory", label: "Task Factory" },
   { href: "/arena", label: "Model Arena" },
+  { href: "/inspector", label: "Evidence Inspector" },
+  { href: "/reports", label: "Run Reports" },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
