@@ -23,8 +23,6 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
 
-from pydantic import ValidationError
-
 from .adapters import PublicInput
 from .evaluate import (
     C3Observations,
@@ -33,12 +31,17 @@ from .evaluate import (
     prepare_c3_observations,
     public_input_sha256,
 )
+from .measured_cohort import (
+    FROZEN_SPLITS,
+    X_SCOPES,
+    frozen_splits,
+    load_frozen_public_tasks,
+    validate_measured_x_scope,
+)
 from .question_bridge import answer_value, score_answer
 from .scene import canonical_json
-from .schemas import PublicTask
 
 CORE_CONDITIONS = ("C0", "C1", "C3")
-FROZEN_SPLITS = ("frozen_main", "frozen_heldout_style")
 OK_STATUS = "ok"
 FAILURE_STATUSES = ("parse_error", "provider_error", "timeout", "refusal")
 BOOTSTRAP_REPS = 1000
@@ -90,24 +93,8 @@ def require_freeze(manifest: dict[str, Any] | None, approval: dict[str, Any] | N
 def _holdout_inputs(
     root: Path, manifest: dict[str, Any], selected: set[str]
 ) -> tuple[C3Observations, dict[str, str]]:
-    public_files = manifest.get("public_files")
-    if not isinstance(public_files, dict):
-        raise PermissionError("measured report requires public holdout checksums")
-    relative = "public/frozen.jsonl"
-    public_path = root / relative
-    try:
-        public_bytes = public_path.read_bytes()
-    except OSError as exc:
-        raise PermissionError("measured report requires the committed public frozen task list") from exc
-    if hashlib.sha256(public_bytes).hexdigest() != public_files.get(relative):
-        raise PermissionError("public frozen task list does not match the holdout manifest")
-    try:
-        tasks = [PublicTask.model_validate_json(line) for line in public_bytes.splitlines() if line.strip()]
-    except ValidationError:
-        raise PermissionError("public frozen task list contains an invalid task") from None
-    cohort = [task for task in tasks if task.task_id in selected]
-    if len(cohort) != len(selected) or {task.task_id for task in cohort} != selected:
-        raise PermissionError("approved tasks must appear exactly once in the public frozen task list")
+    cohort = load_frozen_public_tasks(root, manifest, selected)
+    public_files = manifest["public_files"]
 
     limits = EvalLimits()
     root = root.resolve()
@@ -149,6 +136,7 @@ def _measured_provenance(
     approval: dict[str, Any] | None,
     split: str,
     root: Path,
+    x_scope: str = "balanced",
 ) -> dict[str, Any]:
     if not attempts:
         raise PermissionError("measured report requires nonempty model attempts")
@@ -179,6 +167,8 @@ def _measured_provenance(
         or any(model not in approved_models for model in identities)
     ):
         raise PermissionError("measured report requires approval for the exact provider, model and revision set")
+    if approval.get("x_scope", "balanced") != x_scope:
+        raise PermissionError("measured report requires approval for the requested X scope")
     selected: set[str] = set()
     for by_condition in by_model.values():
         if set(by_condition) != set(CORE_CONDITIONS):
@@ -188,6 +178,7 @@ def _measured_provenance(
             raise PermissionError("measured report requires the same nonempty task selection for every condition")
         require_freeze(manifest, approval, selection_hash(list(first), list(CORE_CONDITIONS)))
         selected = first
+    x_task_count = validate_measured_x_scope(root, manifest, tasks, selected, x_scope)
     observations, approved_inputs = _holdout_inputs(root, manifest, selected)
     input_runs: dict[tuple[str, str, str], set[str]] = defaultdict(set)
     c3_runs: dict[tuple[str, str], set[str]] = defaultdict(set)
@@ -210,6 +201,8 @@ def _measured_provenance(
     return {
         "dataset_manifest_sha256": manifest["manifest_sha256"],
         "selection_hash": approval["selection_hash"],
+        "x_scope": x_scope,
+        "x_task_count": x_task_count,
         "c3_observations_sha256": observations.digest,
         "public_inputs_sha256": approved_inputs,
         "models": [
@@ -480,6 +473,7 @@ def render_markdown(rep: dict[str, Any]) -> str:
         L += [
             f"Holdout manifest SHA-256 `{provenance['dataset_manifest_sha256']}`",
             f"Selection SHA-256 `{provenance['selection_hash']}`",
+            f"X scope `{provenance['x_scope']}` ({provenance['x_task_count']} consistency tasks)",
             f"Verified C3 observation SHA-256 `{provenance['c3_observations_sha256']}`",
             "",
         ]
@@ -573,6 +567,9 @@ def main_metrics(argv: list[str]) -> int:
     )
     ap.add_argument("--rust-pp", default=None, help="path to the Rust `pp` binary: cross-check scoring against it")
     ap.add_argument("--measured", action="store_true", help="require dataset freeze + access approval")
+    ap.add_argument(
+        "--x-scope", choices=X_SCOPES, default="balanced", help="measured X cohort (balanced by default)"
+    )
     ap.add_argument("--approval", default=None, help="approval JSON for the holdout, selection and pinned models")
     a = ap.parse_args(argv)
     root = Path(a.tasks)
@@ -588,9 +585,10 @@ def main_metrics(argv: list[str]) -> int:
         if not isinstance(expected_answers, str) or not re.fullmatch(r"[a-f0-9]{64}", expected_answers):
             raise PermissionError("measured report requires a commitment for private answers")
         approval = json.loads(Path(a.approval).read_text(encoding="utf-8")) if a.approval else None
-        a.split = a.split or ",".join(FROZEN_SPLITS)
-        if not set(a.split.split(",")).issubset(FROZEN_SPLITS):
-            raise PermissionError("measured report requires frozen splits")
+        try:
+            a.split = ",".join(frozen_splits(a.split or ",".join(FROZEN_SPLITS)))
+        except ValueError as exc:
+            raise PermissionError("measured report requires frozen splits") from exc
     tasks = load_tasks(root, expected_sha256=expected_answers)
     if a.attempt_format == "contract":
         from .contract_attempts import load_contract_attempts
@@ -598,7 +596,9 @@ def main_metrics(argv: list[str]) -> int:
         attempts = [row for path in a.attempts for row in load_contract_attempts(Path(path), measured=a.measured)]
     else:
         attempts = [row for path in a.attempts for row in load_attempts(Path(path))]
-    provenance = _measured_provenance(tasks, attempts, manifest, approval, a.split, root) if a.measured else None
+    provenance = (
+        _measured_provenance(tasks, attempts, manifest, approval, a.split, root, a.x_scope) if a.measured else None
+    )
     rep = build_report(tasks, attempts, split=a.split)
     if provenance:
         rep["banner"] = "MEASURED"
