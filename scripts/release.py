@@ -42,6 +42,18 @@ REQUIRED_NESTED_SOURCE = {
     "infra/docker/api.Dockerfile",
     "infra/docker/web.Dockerfile",
 }
+PUBLIC_DOCUMENTATION_ASSETS = {
+    "docs/assets/counterfactuals.png",
+    "docs/assets/evidence-inspector.png",
+    "docs/assets/run-reports-demo.png",
+    "docs/results/dataset_audit.json",
+    "docs/results/dataset_report.json",
+    "docs/results/human_audit_status.json",
+    "docs/results/integration_pilot.md",
+    "docs/results/perturbation.json",
+    "docs/results/smoke_report.json",
+    "docs/results/smoke_report_demo.md",
+}
 SOURCE_DIRS = {
     ".github",
     "apps",
@@ -155,7 +167,7 @@ def _git(repo: Path, *args: str, input_bytes: bytes | None = None) -> bytes:
 
 
 def _source_path(path: str) -> bool:
-    if path in REQUIRED_NESTED_SOURCE:
+    if path in REQUIRED_NESTED_SOURCE or path in PUBLIC_DOCUMENTATION_ASSETS:
         return True
     entry = PurePosixPath(path)
     if len(entry.parts) == 1:
