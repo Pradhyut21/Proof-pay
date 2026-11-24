@@ -18,7 +18,7 @@ Use `--measured --attempt-format contract` only with a privately seeded holdout 
 
 The authorization record includes `approved_by`, the holdout's `manifest_sha256`, the `selection_hash` from `panelproof.metrics.selection_hash(task_ids, conditions)`, and `models`, an array of objects with `provider`, `model_id`, and `model_revision`. This selection hash covers the approved unordered task IDs and conditions. The runner's separate `selected_task_ids_sha256` covers the ordered rows within each run. Include approved limits and exact run commands in the team's local lock record before requesting model inference.
 
-The reporting gate validates artifacts after inference. Obtain authorization and commit to the selected task IDs and conditions before starting requests. A report assembled without `--measured` is labeled development or **DEMO ONLY**. The real provider runner currently accepts C0 and C1. C3 is exercised by the offline fixture.
+The reporting gate validates artifacts after inference. Obtain authorization and commit to the selected task IDs and conditions before starting requests. A report assembled without `--measured` is labeled development or **DEMO ONLY**. The provider runner accepts C0, C1, and C3. C3 preflights the entire cohort by recovering readings directly from PNGs and uses only the visible observations described in [`runner.md`](runner.md).
 
 ## Reported quantities
 
