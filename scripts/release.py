@@ -14,6 +14,7 @@ from pathlib import Path, PurePosixPath
 from unicodedata import normalize
 
 ROOT_FILES = {
+    ".dockerignore",
     ".editorconfig",
     ".env.example",
     ".gitattributes",
@@ -33,6 +34,13 @@ ROOT_FILES = {
     "compose.yaml",
     "run.ps1",
     "run.sh",
+}
+REQUIRED_NESTED_SOURCE = {
+    "apps/web/.prettierignore",
+    "apps/web/.prettierrc",
+    "apps/web/lib/answers.ts",
+    "infra/docker/api.Dockerfile",
+    "infra/docker/web.Dockerfile",
 }
 SOURCE_DIRS = {
     ".github",
@@ -147,6 +155,8 @@ def _git(repo: Path, *args: str, input_bytes: bytes | None = None) -> bytes:
 
 
 def _source_path(path: str) -> bool:
+    if path in REQUIRED_NESTED_SOURCE:
+        return True
     entry = PurePosixPath(path)
     if len(entry.parts) == 1:
         return path in ROOT_FILES

@@ -26,10 +26,17 @@ def source(tmp_path):
     git(repo, "config", "core.autocrlf", "false")
     tracked = {
         "README.md": "committed source\n",
+        ".dockerignore": "data/build\n",
+        "apps/web/.prettierrc": '{"semi": true}',
+        "apps/web/.prettierignore": ".next\n",
+        "apps/web/lib/answers.ts": "export const answerFormat = 'numeric';\n",
+        "infra/docker/api.Dockerfile": "FROM debian:bookworm-slim\n",
+        "infra/docker/web.Dockerfile": "FROM node:22-bookworm-slim\n",
         "python/src/panelproof.py": "def status():\n    return 'ready'\n",
         ".env.example": "MODEL_API_KEY=REPLACE_WITH_KEY\n",
         ".env": "MODEL_API_KEY=fixture-redacted-secret\n",
         "datasets/external/gauge.json": '{"external":true}',
+        "data/demo/private/keys.jsonl": '{"answer":true}',
         "python/private/answers.json": '{"answer":true}',
         "python/.venv/lib/ambient.py": "environment cache",
         "submission/manifest.json": "stale manifest",
@@ -68,8 +75,14 @@ def test_release_pins_commit_and_excludes_working_tree_data(source, tmp_path):
     assert manifest["archive"] == {"file": name, "sha256": digest}
     with zipfile.ZipFile(archive_path) as archive:
         assert archive.namelist() == [
+            "panelproof/.dockerignore",
             "panelproof/.env.example",
             "panelproof/README.md",
+            "panelproof/apps/web/.prettierignore",
+            "panelproof/apps/web/.prettierrc",
+            "panelproof/apps/web/lib/answers.ts",
+            "panelproof/infra/docker/api.Dockerfile",
+            "panelproof/infra/docker/web.Dockerfile",
             "panelproof/python/src/panelproof.py",
             "panelproof/submission/manifest.json",
         ]
