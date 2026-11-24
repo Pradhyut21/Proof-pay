@@ -38,8 +38,9 @@ answer format is keyed by its Review ID. The page works offline.
    UNSURE: you cannot confidently assign any of the other judgments.
    Leave the verdict blank for items you have not reviewed.
 4. For VALID items, enter the answer as instructed next to the panel. Use the
-   listed category spelling or an ordinary decimal value, one space, and unit.
-   Exact answer agreement compares the two trimmed texts.
+   listed category spelling or the integer value in thousandths, one space,
+   and the requested unit. For example, a reading of 1.5 bar is entered as
+   "1500 bar". Exact answer agreement compares the two trimmed texts.
 5. Return your completed CSV privately. Keep the file and its notes out of Git.
 
 This measures reviewer agreement. The pack contains no reference key, and the
@@ -180,7 +181,8 @@ def answer_format(schema: dict) -> str:
             and all(isinstance(x, str) and x for x in units)
         ):
             return (
-                "Enter an ordinary decimal and its unit. Allowed units are "
+                "Enter an integer in thousandths of the unit, then the unit. "
+                "A reading of 1.5 bar is entered as 1500 bar. Allowed units are "
                 + ", ".join(units)
                 + "."
             )

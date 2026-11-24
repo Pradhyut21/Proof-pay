@@ -42,7 +42,7 @@ def bundle(tmp_path):
         (root / folder).mkdir(parents=True)
     cases = [
         ("first-opaque-id", "dev", "accepted", "operational_state"),
-        ("second-opaque-id", "dev", "accepted", "indicator_consistency"),
+        ("second-opaque-id", "dev", "accepted", "reading"),
         ("held-out-opaque-id", "test_frozen", "accepted", "operational_state"),
         ("rejected-opaque-id", "dev", "rejected", "operational_state"),
         ("diagnostic-opaque-id", "diagnostic_abstain", "accepted", "operational_state"),
@@ -57,11 +57,17 @@ def bundle(tmp_path):
                 "schema_version": "1.0.0",
                 "task_id": task_id,
                 "image_path": image,
-                "question": f"Visible question {index} & context",
+                "question": (
+                    "Visible question 2 & context. Return the value in thousandths of the displayed unit."
+                    if skill == "reading" else f"Visible question {index} & context"
+                ),
                 "public_rules": "Use the panel.",
                 "response_schema": {
                     "examples": ["excluded-schema-example"],
                     "properties": {
+                        "kind": {"enum": ["numeric"]},
+                        "unit": {"enum": ["bar"]},
+                    } if skill == "reading" else {
                         "kind": {"enum": ["category"]},
                         "value": {
                             "enum": ["OPTION_A", "OPTION_B"],
@@ -120,6 +126,10 @@ def test_pack_is_deterministic_and_pilot_order_is_preserved(bundle, tmp_path):
         assert "Visible question 4" not in page
         assert "Visible question 5" not in page
         assert "&amp; context" in page
+        assert "Return the value in thousandths of the displayed unit" in page
+        assert "A reading of 1.5 bar is entered as 1500 bar" in page
+        assert "ordinary decimal" not in page
+        assert '"1500 bar"' in packed.read("INSTRUCTIONS.txt").decode()
         for reviewer in "AB":
             form = list(
                 csv.DictReader(io.StringIO(packed.read(f"reviewer_{reviewer}.csv").decode()))
