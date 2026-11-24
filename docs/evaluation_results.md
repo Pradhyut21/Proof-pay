@@ -18,6 +18,6 @@ The same 50 development tasks passed preflight under C0, C1, and C3. The sample 
 ## Scope
 
 - The existing measured holdout covers two layouts and four themes under one pressure-rule family. The public v0.3 configuration adds a third layout. The held-out theme tests style changes. [Dataset card](dataset_card.md)
-- Raster verification targets clean renders. The historical perturbation study had zero recoveries under 1° rotation or sigma-3 noise on 30 scenes per setting. [Perturbation evidence](validation.md#3-raster-verifier-under-perturbation)
+- Production verification targets clean renders. A separate 100-scene study found improved exact recovery for small rotations and mild noise in the opt-in mode. [Recovery study](validation.md#opt-in-small-distortion-study)
 - The balanced X slice controls the marginal ALARM shortcut. The full held-out dataset remains available for analysis with its separate shortcut audit.
 - Model error analysis requires actual outputs. For an approved run, record matched sample counts, accuracies with both denominators, failures and uncertainty, and inspectable cases tied to the question, image, and reference. [Frozen protocol](../evals/protocol.md) · [Submission checklist](../submission/DELIVERABLE.md)

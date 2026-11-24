@@ -52,6 +52,7 @@ PUBLIC_DOCUMENTATION_ASSETS = {
     "docs/results/human_audit_status.json",
     "docs/results/integration_pilot.md",
     "docs/results/perturbation.json",
+    "docs/results/small_distortion_study.json",
     "docs/results/smoke_report.json",
     "docs/results/smoke_report_demo.md",
 }

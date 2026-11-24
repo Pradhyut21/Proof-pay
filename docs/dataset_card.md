@@ -34,7 +34,7 @@ The [v0.3 expanded configuration](../configs/benchmark-expanded.yaml) adds `2p-c
 
 ![Two side-by-side pump modules with stacked gauges showing kPa, bar, and psi](assets/column-layout.png)
 
-The audited public build accepted **688 answerable tasks**, **285 valid question pairs**, and **40 separate diagnostic tasks**. It includes 347 single-pump, 160 two-pump row, and 181 two-pump column tasks. All three layouts occur in both development and frozen-style groups of this public reproducibility build. The audit found zero cross-split groups, images, and seeds. Its manifest SHA-256 is `a8f51620ddfbfd13033e22804eae1be87cb043ead1db82cd08b44f0fc89c6d6a`. [Reproduce the expanded build](reproducibility.md#build-the-expanded-layout-dataset)
+The audited public build accepted **688 answerable tasks**, **285 valid question pairs**, and **40 separate diagnostic tasks**. It includes 347 single-pump, 160 two-pump row, and 181 two-pump column tasks. All three layouts occur in both development and frozen-style groups of this public reproducibility build. The audit found zero cross-split groups, images, and seeds. A second build reproduced its manifest SHA-256 `a8f51620ddfbfd13033e22804eae1be87cb043ead1db82cd08b44f0fc89c6d6a`. [Reproduce the expanded build](reproducibility.md#build-the-expanded-layout-dataset)
 
 ## Current private holdout
 

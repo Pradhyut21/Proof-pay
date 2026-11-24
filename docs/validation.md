@@ -54,6 +54,27 @@ Reading the table honestly:
 - The 30-scene sample is small and drawn from the first 30 accepted base groups, so rates have wide uncertainty. Real photographs are out of scope.
 - The first run of this study (before the unit table change to psi = 6.894757293168 kPa) reported false accepts under glare. The current run, on the rebuilt dataset, reports none. The scenes and unit table differ between the runs and the cause of the change was not isolated, so the earlier false accepts are not evidence of a fix and glare remains a risk worth re-testing on more scenes.
 
+## Opt-in small-distortion study
+
+This study compared the same 100 accepted base scenes from the audited v0.2 holdout under both verifier modes. The study took the first unique original scenes in exported index order. Each perturbation was applied separately, and Gaussian noise used a reproducible per-image draw. The clean row is a control over scenes that had already passed clean verification.
+
+| Input | Exact recovery with production reader | Exact recovery with opt-in recovery | Opt-in rejections |
+| --- | ---: | ---: | ---: |
+| Clean | 100 / 100 | 100 / 100 | 0 |
+| Gaussian noise σ=3 | 5 / 100 | 58 / 100 | 42 |
+| Rotation +1° | 0 / 100 | 64 / 100 | 36 |
+| Rotation −1° | 6 / 100 | 66 / 100 | 34 |
+
+Neither mode accepted an incorrect reading on these inputs, including in partly rejected scenes. Exact recovery requires matching gauge ticks, units, indicators, and rule outcomes. The report also records the older one-tick-tolerant comparison as a separate metric. [Aggregate study result](results/small_distortion_study.json)
+
+The opt-in mode estimates a small shared tilt from long perpendicular panel borders. For mild speckle, it cleans the instrument-detection masks while retaining the original reading thresholds. The production dataset, Task Factory, and C3 runner continue to use the clean-render reader. This experiment covers only the three synthetic distortions shown above. Deskewed evidence coordinates refer to the normalized image.
+
+Run the same comparison on the same holdout, once with the optional flag and once without it.
+
+```sh
+uv run --project python --python 3.11 --locked python -m panelproof.cli perturb --dataset /local/holdout --limit 100 --workers 4 --axes none gaussian_noise_sigma3 rotate_1deg rotate_minus_1deg --recover-small-distortions --out /local/recovery.json
+```
+
 ## 4. Cross-implementation parity
 
 | Check | Result | Where run |
