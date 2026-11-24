@@ -17,11 +17,12 @@ interface Props {
   set: DatasetSet;
   task: PublicTask;
   label: string;
+  job?: string;
   evidence?: EvidenceRegion[] | null;
 }
 
 /** Panel image with zoom. Evidence boxes are drawn only when the backend has revealed them. */
-export function PanelViewer({ set, task, label, evidence }: Props) {
+export function PanelViewer({ set, task, label, evidence, job }: Props) {
   const [zoom, setZoom] = useState(1);
   const idx = ZOOMS.indexOf(zoom);
   return (
@@ -61,7 +62,7 @@ export function PanelViewer({ set, task, label, evidence }: Props) {
         <div className="relative" style={{ width: `${zoom * 100}%` }}>
           {/* eslint-disable-next-line @next/next/no-img-element -- local API image, intrinsic size known */}
           <img
-            src={imageUrl(set, task.task_id)}
+            src={imageUrl(set, task.task_id, job)}
             alt={`${label}: synthetic water-pump control panel with two dials and RUN and ALARM lamps`}
             width={IMAGE_WIDTH}
             height={IMAGE_HEIGHT}

@@ -10,11 +10,12 @@ import { OutcomeBadge } from "./OutcomeBadge";
 interface Props {
   set: DatasetSet;
   task: PublicTask;
+  job?: string;
   onResult?: (outcome: DisplayOutcome) => void;
 }
 
 /** Shows the public question + rules and submits one human attempt through the backend. */
-export function QuestionForm({ set, task, onResult }: Props) {
+export function QuestionForm({ set, task, onResult, job }: Props) {
   const uid = useId();
   const spec = useMemo(() => specFromSchema(task.response_schema), [task.response_schema]);
   const [category, setCategory] = useState<string>();
@@ -35,7 +36,7 @@ export function QuestionForm({ set, task, onResult }: Props) {
     setBusy(true);
     let result: DisplayOutcome | undefined;
     try {
-      const r = await api.postAttempt(set, task.task_id, built.answer);
+      const r = await api.postAttempt(set, task.task_id, built.answer, job);
       result = r.correct ? "correct" : "incorrect";
     } catch (err) {
       if (err instanceof ApiError && err.kind === "timeout") result = "timeout";
