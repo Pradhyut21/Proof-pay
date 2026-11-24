@@ -1,0 +1,126 @@
+{
+  "schema_version": "1.0.0",
+  "audited_on": "2026-11-24",
+  "method": "Read-only: GitHub REST metadata and file contents via `gh api`, Hugging Face public dataset metadata via HTTP GET. No upstream script, notebook, weight file or dataset was downloaded or executed.",
+  "references": [
+    {
+      "name": "MeasureBench code",
+      "url": "https://github.com/flageval-baai/MeasureBench",
+      "pinned_sha": "d5bb8652dbde6b1b5507f89d37f73993af28b830",
+      "commit_date": "2026-03-26T02:47:51Z",
+      "code_license": "none declared (GitHub reports no license identifier)",
+      "entry_points": ["data_machine/README.md", "data_machine/requirements.txt", "data_machine/generate_data.py -l", "evaluation/evaluate.py"],
+      "dependency_pins": ["bpy==3.6.0", "numpy>=2.0,<=2.3", "opencv-python<=4.8.0.76", "matplotlib", "mathutils", "pillow", "loguru"],
+      "decision": "design reference only (separate generation and scoring); no code reused",
+      "redistribution": "not redistributed"
+    },
+    {
+      "name": "MeasureBench dataset",
+      "url": "https://huggingface.co/datasets/FlagEval/MeasureBench",
+      "pinned_revision": "93c001671055f739bc396c73aa6b2d5e6171abed",
+      "last_modified": "2025-11-03T02:08:53Z",
+      "dataset_license": "cc-by-sa-4.0 (dataset card metadata)",
+      "gated": false,
+      "decision": "optional real reading slice, NOT downloaded or packaged; requires an attribution, share-alike and checksum decision first",
+      "redistribution": "undecided; blocked until a deterministic selection and checksums are recorded"
+    },
+    {
+      "name": "MeasureBench paper",
+      "url": "https://arxiv.org/abs/2510.26865",
+      "pinned_revision": null,
+      "decision": "cited; claims not re-verified here",
+      "status": "unverified (not opened during this audit)"
+    },
+    {
+      "name": "ETH analog gauge reader",
+      "url": "https://github.com/ethz-asl/analog_gauge_reader",
+      "pinned_sha": "518cdfaab1e9c7cdabb1ef957e45311fe3f6a47a",
+      "commit_date": "2024-05-13T12:31:39Z",
+      "code_license": "MIT (LICENSE.md; pyproject.toml)",
+      "entry_points": ["pipeline.py", "angle_reading_fit/", "pyproject.toml", "poetry.lock"],
+      "dependency_pins": ["python ^3.8", "torch 2.0.0", "torchvision 0.15.1", "mmcv 2.0.0 (wheel URL)", "mmdet 3.0.0", "mmocr 1.0.0", "ultralytics 8.0.66", "scikit-learn 1.2.2"],
+      "decision": "design reference for needle geometry and calibration; heavy ML stack not reused. Model-weight terms not verified",
+      "redistribution": "not redistributed"
+    },
+    {
+      "name": "Classical Hough gauge reader",
+      "url": "https://github.com/jk-ethz/analog-gauge-meter-reader-hough",
+      "pinned_sha": "b1759194ee49a0e558f7ff5d77e632ff2ca30d2b",
+      "commit_date": "2022-10-21T11:59:39Z",
+      "code_license": "MIT",
+      "entry_points": ["analog_gauge_reader.py"],
+      "decision": "design reference for a classical OpenCV approach; PanelProof wrote its own verifier",
+      "redistribution": "not redistributed"
+    },
+    {
+      "name": "CLEVR dataset generator",
+      "url": "https://github.com/facebookresearch/clevr-dataset-gen",
+      "pinned_sha": "f0ce2c81750bfae09b5bf94d009f42e055f2cb3a",
+      "commit_date": "2019-03-22T18:20:09Z",
+      "code_license": "BSD License (LICENSE file; GitHub SPDX NOASSERTION) plus a separate PATENTS file",
+      "entry_points": ["image_generation/render_images.py", "question_generation/generate_questions.py"],
+      "archived": true,
+      "decision": "scene/render/question separation used as a design reference; no code reused",
+      "redistribution": "not redistributed"
+    },
+    {
+      "name": "DynaMath",
+      "url": "https://github.com/DynaMath/DynaMath",
+      "pinned_sha": "598c3c3d732422d29580e9ecf8f2a7928a068fdd",
+      "commit_date": "2024-11-25T16:48:16Z",
+      "code_license": "none declared (GitHub reports no license identifier)",
+      "entry_points": ["Dockerfile", "dataset_generator/", "evaluation/", "README.md"],
+      "decision": "worst-case accuracy over seed groups adopted as a method (reimplemented); no code reused",
+      "redistribution": "not redistributed"
+    },
+    {
+      "name": "VLMEvalKit",
+      "url": "https://github.com/open-compass/VLMEvalKit",
+      "pinned_sha": "2f11dc888838404991214cce0358fff815be7ff6",
+      "commit_date": "2026-11-24T02:46:12Z",
+      "code_license": "Apache-2.0",
+      "entry_points": ["run.py", "requirements.txt", "vlmeval/dataset/"],
+      "decision": "adapter/dataset boundary as a design reference; the PanelProof runner stays small and offline-first",
+      "redistribution": "not redistributed"
+    },
+    {
+      "name": "Henomaly",
+      "url": "https://github.com/RishitRai/Henomaly",
+      "pinned_sha": "d608debec86bb13b69eb7d0d907b6c3aaa9831e2",
+      "commit_date": "2026-10-18T18:59:25Z",
+      "code_license": "AGPL-3.0",
+      "entry_points": ["app/console/README.md", "docs/research/evidence/README.md"],
+      "decision": "demo/failure-review reference only. AGPL-3.0 code must not be copied into this repository; PanelProof implements its own evidence views",
+      "redistribution": "not redistributed"
+    },
+    {
+      "name": "Omnisynth (Devpost)",
+      "url": "https://devpost.com/software/omnisynth",
+      "http_status": 200,
+      "status": "unverified: the page responded, but its content, authorship and any linked repository were not read or confirmed"
+    },
+    {
+      "name": "Henomaly (Devpost)",
+      "url": "https://devpost.com/software/holy-crap",
+      "http_status": 200,
+      "status": "unverified: page responded; content not read. The GitHub repository above is audited separately"
+    },
+    {
+      "name": "JengaBench (Devpost)",
+      "url": "https://devpost.com/software/jengabench",
+      "http_status": 200,
+      "status": "unverified: page responded; content and linked repository not read or confirmed"
+    },
+    {
+      "name": "Agent Gauntlet (Devpost)",
+      "url": "https://devpost.com/software/agent-gauntlet",
+      "http_status": 200,
+      "status": "unverified: page responded; content and linked repository not read or confirmed"
+    },
+    {
+      "name": "Legal LLM Safety Metrics",
+      "url": null,
+      "status": "unverified: the planning notes were not available to this audit, so the project's identity and source could not be located"
+    }
+  ]
+}

@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "JsonValue": {}
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "task_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$",
+      "title": "Task Id",
+      "type": "string"
+    },
+    "image_path": {
+      "pattern": "^images/[A-Za-z0-9][A-Za-z0-9_-]{0,79}\\.png$",
+      "title": "Image Path",
+      "type": "string"
+    },
+    "question": {
+      "maxLength": 4096,
+      "minLength": 1,
+      "title": "Question",
+      "type": "string"
+    },
+    "public_rules": {
+      "maxLength": 4096,
+      "minLength": 1,
+      "title": "Public Rules",
+      "type": "string"
+    },
+    "response_schema": {
+      "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+      },
+      "title": "Response Schema",
+      "type": "object"
+    }
+  },
+  "required": [
+    "schema_version",
+    "task_id",
+    "image_path",
+    "question",
+    "public_rules",
+    "response_schema"
+  ],
+  "title": "PublicTask",
+  "type": "object"
+}

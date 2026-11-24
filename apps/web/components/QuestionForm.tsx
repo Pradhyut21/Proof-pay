@@ -1,45 +1,53 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { api, ApiError } from "@/lib/api";
-import { buildResponse } from "@/lib/answers";
-import type { DisplayOutcome, PublicTask } from "@/lib/types";
+import { buildAnswer, specFromSchema } from "@/lib/answers";
+import type { DatasetSet, DisplayOutcome, PublicTask } from "@/lib/types";
 import { OutcomeBadge } from "./OutcomeBadge";
 
 interface Props {
+  set: DatasetSet;
   task: PublicTask;
   onResult?: (outcome: DisplayOutcome) => void;
 }
 
 /** Shows the public question + rules and submits one human attempt through the backend. */
-export function QuestionForm({ task, onResult }: Props) {
+export function QuestionForm({ set, task, onResult }: Props) {
   const uid = useId();
+  const spec = useMemo(() => specFromSchema(task.response_schema), [task.response_schema]);
   const [category, setCategory] = useState<string>();
   const [numeric, setNumeric] = useState("");
+  const [unit, setUnit] = useState<string>();
   const [error, setError] = useState<string>();
   const [outcome, setOutcome] = useState<DisplayOutcome>();
   const [busy, setBusy] = useState(false);
-  const schema = task.response_schema;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(undefined);
-    const built = buildResponse(schema, { category, numeric });
+    const built = buildAnswer(spec, { category, numeric, unit });
     if (!built.ok) {
       setError(built.message);
       return;
     }
     setBusy(true);
-    let result: DisplayOutcome;
+    let result: DisplayOutcome | undefined;
     try {
-      result = (await api.postAttempt(task.task_id, built.response)).outcome;
+      const r = await api.postAttempt(set, task.task_id, built.answer);
+      result = r.correct ? "correct" : "incorrect";
     } catch (err) {
-      result = err instanceof ApiError && err.kind === "timeout" ? "timeout" : "offline";
+      if (err instanceof ApiError && err.kind === "timeout") result = "timeout";
+      else if (err instanceof ApiError && err.kind === "http" && err.status === 422)
+        result = "invalid";
+      else if (err instanceof ApiError && err.kind === "http") {
+        setError(`The server refused this attempt (${err.message}).`);
+      } else result = "offline";
     }
     setBusy(false);
     setOutcome(result);
-    onResult?.(result);
+    if (result) onResult?.(result);
   }
 
   return (
@@ -51,12 +59,12 @@ export function QuestionForm({ task, onResult }: Props) {
         <summary className="min-h-11 cursor-pointer font-semibold leading-[2.75rem]">
           Public rules
         </summary>
-        <p className="pb-1 text-muted-foreground">{task.rules}</p>
+        <p className="pb-1 text-muted-foreground">{task.public_rules}</p>
       </details>
-      {schema.type === "category" ? (
+      {spec.type === "category" ? (
         <fieldset className="space-y-1">
           <legend className="text-sm font-semibold">Your answer</legend>
-          {schema.allowed.map((opt) => (
+          {spec.allowed.map((opt) => (
             <label key={opt} className="flex min-h-11 items-center gap-2">
               <input
                 type="radio"
@@ -70,21 +78,39 @@ export function QuestionForm({ task, onResult }: Props) {
             </label>
           ))}
         </fieldset>
-      ) : (
+      ) : spec.type === "numeric" ? (
         <div className="space-y-1">
           <label htmlFor={`${uid}-num`} className="text-sm font-semibold">
-            Your answer ({schema.unit})
+            Your answer (a number in the unit chosen beside it)
           </label>
-          <input
-            id={`${uid}-num`}
-            inputMode="decimal"
-            value={numeric}
-            onChange={(ev) => setNumeric(ev.target.value)}
-            aria-describedby={error ? `${uid}-err` : undefined}
-            aria-invalid={error ? true : undefined}
-            className="block min-h-11 w-full rounded-md border border-border bg-background px-3"
-          />
+          <div className="flex gap-2">
+            <input
+              id={`${uid}-num`}
+              inputMode="decimal"
+              value={numeric}
+              onChange={(ev) => setNumeric(ev.target.value)}
+              aria-describedby={error ? `${uid}-err` : undefined}
+              aria-invalid={error ? true : undefined}
+              className="block min-h-11 w-full rounded-md border border-border bg-background px-3"
+            />
+            <select
+              aria-label="Unit"
+              value={unit ?? spec.units[0]}
+              onChange={(ev) => setUnit(ev.target.value)}
+              className="min-h-11 rounded-md border border-border bg-background px-2"
+            >
+              {spec.units.map((u) => (
+                <option key={u} value={u}>
+                  {u}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
+      ) : (
+        <p role="alert" className="text-sm font-semibold text-danger">
+          This answer format is not supported by the form.
+        </p>
       )}
       {error ? (
         <p id={`${uid}-err`} role="alert" className="text-sm font-semibold text-danger">
@@ -92,7 +118,7 @@ export function QuestionForm({ task, onResult }: Props) {
         </p>
       ) : null}
       <div className="flex flex-wrap items-center gap-3">
-        <Button type="submit" disabled={busy}>
+        <Button type="submit" disabled={busy || spec.type === "unsupported"}>
           {busy ? "Scoring…" : "Submit answer"}
         </Button>
         <div aria-live="polite">{outcome ? <OutcomeBadge outcome={outcome} /> : null}</div>

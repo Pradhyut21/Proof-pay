@@ -26,7 +26,7 @@ export default function ArenaPage() {
 
   useEffect(() => {
     api
-      .listPairs()
+      .listPairs("demo")
       .then((p) => {
         setPairs(p);
         if (p[0]) setPairId(p[0].pair_id);
@@ -42,11 +42,14 @@ export default function ArenaPage() {
     setMessage(undefined);
     Promise.all(
       pair.task_ids.map(async (id, i) => {
-        const [task, ma] = await Promise.all([api.getTask(id), api.modelAttempts(id)]);
+        const [task, ma] = await Promise.all([
+          api.getTask("demo", id),
+          api.modelAttempts("demo", id),
+        ]);
         return {
           task,
           label: i === 0 ? "Panel A" : "Panel B",
-          attempts: ma.attempts,
+          attempts: ma,
         } satisfies Side;
       }),
     )
@@ -59,7 +62,7 @@ export default function ArenaPage() {
 
   async function reveal() {
     try {
-      const revealed = await Promise.all(sides.map((s) => api.reveal(s.task.task_id)));
+      const revealed = await Promise.all(sides.map((s) => api.reveal("demo", s.task.task_id)));
       setSides((prev) => prev.map((s, i) => ({ ...s, reveal: revealed[i] })));
     } catch (e) {
       setMessage(
@@ -111,8 +114,13 @@ export default function ArenaPage() {
       <div className="grid gap-6 lg:grid-cols-2" data-testid="variant-compare">
         {sides.map((s) => (
           <Card key={s.task.task_id} className="space-y-4">
-            <PanelViewer task={s.task} label={s.label} evidence={s.reveal?.evidence} />
-            <QuestionForm task={s.task} />
+            <PanelViewer
+              set="demo"
+              task={s.task}
+              label={s.label}
+              evidence={s.reveal?.evidence_regions}
+            />
+            <QuestionForm set="demo" task={s.task} />
             {s.reveal ? (
               <p data-testid="revealed-answer" className="font-semibold">
                 Correct answer: {formatAnswer(s.reveal.answer)}

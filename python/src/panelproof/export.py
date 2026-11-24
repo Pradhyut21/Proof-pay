@@ -21,17 +21,49 @@ import cv2
 import numpy as np
 import yaml
 
-from . import SCHEMA_VERSION
-from .interim_questions import Question, answer_from_trace, answers_agree, build_questions, response_schema
-from .interim_rules import public_rules_text
 from .mutations import Variant, make_missing, make_nuisance, make_preserving, make_semantic_flip
+from .question_bridge import (
+    Question,
+    answer_from_trace,
+    answers_agree,
+    build_questions,
+    response_schema,
+)
 from .render import check_layout, evidence_annotations, png_bytes, render_scene
 from .scene import Scene, canonical_json, config_hash, generate_scene, load_config, scene_from_dict
+from .schemas import SCHEMA_VERSION, PrivateTask, PublicTask
 from .units import repo_root
 from .validate import compare_trace_to_scene
 from .verify import VERIFIER_VERSION, verify_png
 
-PUBLIC_KEYS = {"schema_version", "task_id", "image", "question", "rules", "response_schema", "set"}
+PUBLIC_KEYS = {"schema_version", "task_id", "image_path", "question", "public_rules", "response_schema"}
+SPLIT_TO_CONTRACT = {"dev": "dev", "frozen_main": "test_frozen", "frozen_heldout_style": "test_frozen"}
+VARIANT_TO_CONTRACT = {
+    "base": "original",
+    "semantic": "semantic",
+    "preserving": "semantic_preserve",
+    "nuisance": "nonsemantic",
+    "missing": "evidence_removed",
+}
+
+
+def contract_evidence(evidence: list[dict[str, Any]], pump_id: str) -> list[dict[str, Any]]:
+    """Generator-side boxes as contract EvidenceRegion records (instrument ids are pump + part)."""
+    out = []
+    for e in evidence:
+        if e["pump"] != pump_id or e["kind"] == "module":
+            continue
+        x0, y0, x1, y1 = (max(0, int(round(v))) for v in e["box"])
+        out.append(
+            {
+                "instrument_id": f"{e['pump']}_{e['kind']}".replace("-", "_"),
+                "x": x0,
+                "y": y0,
+                "width": max(1, x1 - x0),
+                "height": max(1, y1 - y0),
+            }
+        )
+    return out
 
 
 def sha(b: bytes) -> str:
@@ -205,6 +237,7 @@ def build_dataset(cfg_path: Path, out: Path, workers: int | None = None) -> dict
 
     pub: dict[str, list[dict[str, Any]]] = defaultdict(list)
     priv: list[dict[str, Any]] = []
+    contract_rows: list[dict[str, Any]] = []
     for t in tasks:
         rel = image_path(t["png"])
         q: Question = t["q"]
@@ -215,15 +248,37 @@ def build_dataset(cfg_path: Path, out: Path, workers: int | None = None) -> dict
         public = {
             "schema_version": SCHEMA_VERSION,
             "task_id": task_id,
-            "image": rel,
+            "image_path": rel,
             "question": q.text,
-            "rules": public_rules_text(),
+            "public_rules": q.public_rules,
             "response_schema": response_schema(q, diag),
-            "set": t["set"],
         }
         assert set(public) == PUBLIC_KEYS
+        PublicTask.model_validate(public)
         bucket = "diagnostic" if diag else ("dev" if t["split"] == "dev" else "frozen")
         pub[bucket].append(public)
+        ans = {"kind": "category", "value": "INSUFFICIENT"} if diag else {
+            k: v for k, v in q.answer.items() if k != "tolerance_milli"
+        }
+        contract_priv = PrivateTask.model_validate(
+            {
+                "schema_version": SCHEMA_VERSION,
+                "task_id": task_id,
+                "base_scene_id": t["scene"].scene_id,
+                "group_id": hid(t["group_id"], "grp"),
+                "variant_kind": VARIANT_TO_CONTRACT[t["variant_kind"]],
+                "split": "diagnostic_abstain" if diag else SPLIT_TO_CONTRACT[t["split"]],
+                "skill": q.contract_skill,
+                "difficulty": {"band": difficulty(t["scene"], q.pump_id)},
+                "answer": ans,
+                "tolerance_milli": None if diag or ans["kind"] != "numeric" else q.answer["tolerance_milli"],
+                "evidence_regions": contract_evidence(t["evidence"], q.pump_id) or None,
+                "solver_version": f"pp-rules-{SCHEMA_VERSION}+{VERIFIER_VERSION}",
+                "image_sha256": images[rel],
+                "validation_status": "accepted",
+            }
+        )
+        contract_rows.append(contract_priv.model_dump(mode="json"))
         priv.append(
             {
                 "task_id": task_id,
@@ -256,6 +311,9 @@ def build_dataset(cfg_path: Path, out: Path, workers: int | None = None) -> dict
     for k in pub:
         pub[k].sort(key=lambda r: r["task_id"])
         jsonl(public_dir / f"{k}.jsonl", pub[k])
+    # Shared-contract bundle layout (what the Axum API imports): public/tasks.jsonl + private/tasks.jsonl.
+    jsonl(public_dir / "tasks.jsonl", sorted((r for rows in pub.values() for r in rows), key=lambda r: r["task_id"]))
+    jsonl(out / "private" / "tasks.jsonl", sorted(contract_rows, key=lambda r: r["task_id"]))
     priv.sort(key=lambda r: r["task_id"])
     jsonl(out / "private" / "answers.jsonl", priv)
     jsonl(

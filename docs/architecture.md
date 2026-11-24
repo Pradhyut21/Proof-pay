@@ -1,0 +1,45 @@
+# Architecture
+
+PanelProof has three layers that meet only at the shared contract ([`reference/CONTRACT.md`](../reference/CONTRACT.md), schemas in `schemas/`).
+
+```
+configs/*.yaml ──► Python factory ──► dataset bundle ──► Rust API ──► Next.js web app
+ (seeded)          generate, render,   public/tasks.jsonl   Axum + SQLite   Task Factory, Arena,
+                   verify, export      private/tasks.jsonl  reveal/attempts  judge flow
+                          │            images/*.png                 ▲
+                          └─ independent raster verifier            │
+                                                    Rust oracle + scorer (pp)
+```
+
+## Components
+
+| Layer | Path | Responsibility |
+| --- | --- | --- |
+| Scene and rules | `python/src/panelproof/{scene,rules,rule_bridge,units}.py` | Seeded fictional panels; RUN/ALARM/pressure rules; fixed-point milli units with ties-away rounding from `shared/units.json` |
+| Renderer | `render.py` | Draws a scene to PNG (two layout families, four themes) and emits evidence boxes |
+| Independent verifier | `verify.py`, `validate.py` | Recovers readings from the PNG using raster analysis only (no scene data) and compares them to the scene truth |
+| Counterfactuals | `mutations.py` | Semantic-flip, answer-preserving (unit conversion), nuisance and missing-evidence siblings |
+| Questions | `questions.py`, `question_bridge.py` | R, C, M, X task builders and the public/private split of each question |
+| Export | `export.py`, `factory.py` | Contract bundle, split assignment by group, deterministic manifest hash |
+| Metrics | `metrics.py`, `contract_attempts.py` | Matched C0/C1/C3 conditions, cluster bootstrap, parity with the Rust scorer |
+| Oracle and scoring | `crates/{oracle,scoring}` | Independent Rust solver and the `pp` scorer |
+| API | `crates/api` | Public task projection, token-protected reveal, idempotent attempts |
+| Web | `apps/web` | Same-origin proxy to the API (the reveal token never reaches the browser), Task Factory, Arena |
+
+## Trust boundaries
+
+- Public records carry only `task_id`, `image_path`, `question`, `public_rules` and `response_schema`. Seeds, answers and evidence boxes live under `private/`.
+- The reveal token is read from `PANELPROOF_REVEAL_TOKEN` by the Next.js server (`apps/web/lib/server/config.ts`) and by the API. It is never sent to client code.
+- Task Factory jobs run on the Next.js server (`apps/web/lib/server/jobs.ts`) and shell out to `panelproof-cli`. This is an interim runner (see *Known gaps*).
+
+## Extending
+
+- **New instrument or rule.** Add the instrument to `scene.py` and `render.py`, extend `rules.py` and the Rust oracle together, and add a case to `scripts/check_solver_parity.py`. The parity script compares both implementations on 1000 seeded scenes.
+- **New layout family or theme.** Add it in `configs/generator.yaml`. Held-out style groups (`heldout_theme` in `configs/benchmark.yaml`) go to the frozen side only.
+- **New model adapter.** Add a provider in `python/src/panelproof/adapters.py` and an entry in `configs/models.yaml`. Live runs need `--allow-live`, a positive cost cap and an authorizing account; see [`evals/runner.md`](../evals/runner.md).
+
+## Known gaps
+
+- The API has no job routes, so the Task Factory runner lives in the web layer.
+- The factory writes model attempts in its own fixture format that `metrics --attempt-format` converts; the shared run format is `python -m panelproof.evaluate`.
+- Only two layout families exist; generalization claims beyond them are unsupported.

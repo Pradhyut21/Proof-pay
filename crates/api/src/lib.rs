@@ -1,543 +1,291 @@
-//! PanelProof local API (INTERIM fixture service for PP-15/PP-17).
-//!
-//! PP-14 owns the production service (SQLx/SQLite job state, full contract). This crate serves the
-//! public task projection, scores human attempts with `pp-scoring`, gates evidence reveal, runs
-//! bounded Python generation jobs, and validates worker output hashes before publishing it.
+//! Local HTTP service for importing, inspecting and scoring accepted task bundles.
 
-use axum::{
-    extract::{DefaultBodyLimit, Path, State},
-    http::{header, HeaderMap, StatusCode},
-    response::{IntoResponse, Response},
-    routing::{get, post},
-    Json, Router,
-};
-use serde::Deserialize;
+mod artifacts;
+
+use std::collections::BTreeMap;
+use std::path::Path as FilePath;
+use std::sync::Arc;
+
+use axum::extract::{DefaultBodyLimit, Path, Query, State};
+use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
+use axum::response::{IntoResponse, Response};
+use axum::routing::{get, post};
+use axum::{Json, Router};
+use panelproof_scoring::{answers_match, Answer};
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use sha2::{Digest, Sha256};
-use std::{
-    collections::{BTreeMap, HashMap},
-    path::{Path as FsPath, PathBuf},
-    sync::{
-        atomic::{AtomicU64, Ordering},
-        Arc,
-    },
-    time::{Duration, Instant},
-};
-use tokio::sync::{Mutex, RwLock, Semaphore};
+use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
+use sqlx::SqlitePool;
+use subtle::ConstantTimeEq;
 
-pub const PUBLIC_KEYS: [&str; 7] = [
-    "schema_version",
-    "task_id",
-    "image",
-    "question",
-    "rules",
-    "response_schema",
-    "set",
-];
-const MAX_BODY: usize = 16 * 1024;
-const MAX_TASKS: usize = 5000;
-const MAX_IMAGE_BYTES: u64 = 4 * 1024 * 1024;
+use artifacts::{load_tasks, valid_answer, valid_id, EvidenceRegion, PublicTask, Task};
 
 #[derive(Clone)]
-pub struct Config {
-    pub data_dir: PathBuf,
-    pub runs_dir: PathBuf,
-    pub repo_root: PathBuf,
-    pub python: String,
-    pub reveal_token: Option<String>,
-    pub allowed_origins: Vec<String>,
-    pub job_deadline: Duration,
-    pub max_count: u32,
+struct AppState {
+    tasks: Arc<BTreeMap<String, Task>>,
+    db: SqlitePool,
+    reveal_token: Option<Arc<str>>,
 }
 
-#[derive(Default)]
-pub struct Store {
-    tasks: BTreeMap<String, Value>,
-    keys: HashMap<String, Value>,
-    pairs: Vec<Value>,
-    model_attempts: HashMap<String, Vec<Value>>,
-    images: HashMap<String, PathBuf>,
-    attempts: Vec<Value>,
+/// Import a read-only dataset and construct the local routes.
+pub async fn open(
+    dataset: &FilePath,
+    database: &FilePath,
+    reveal_token: Option<String>,
+) -> anyhow::Result<Router> {
+    anyhow::ensure!(
+        reveal_token.as_ref().is_none_or(|token| {
+            (16..=128).contains(&token.len()) && token.bytes().all(|b| b.is_ascii_graphic())
+        }),
+        "reveal token must contain 16–128 visible ASCII characters"
+    );
+    let tasks = Arc::new(load_tasks(dataset)?);
+    let db = SqlitePoolOptions::new()
+        .max_connections(1)
+        .connect_with(
+            SqliteConnectOptions::new()
+                .filename(database)
+                .create_if_missing(true),
+        )
+        .await?;
+    sqlx::raw_sql(include_str!("../../../migrations/001_init.sql"))
+        .execute(&db)
+        .await?;
+    Ok(Router::new()
+        .route("/healthz", get(health))
+        .route("/api/v1/capabilities", get(capabilities))
+        .route("/api/v1/tasks", get(list_tasks))
+        .route("/api/v1/tasks/{id}", get(task))
+        .route("/api/v1/tasks/{id}/image", get(image))
+        .route("/api/v1/tasks/{id}/reveal", post(reveal))
+        .route("/api/v1/attempts", post(attempt))
+        .layer(DefaultBodyLimit::max(16 * 1024))
+        .with_state(AppState {
+            tasks,
+            db,
+            reveal_token: reveal_token.map(Arc::from),
+        }))
 }
 
-#[derive(Clone, Debug)]
-struct Job {
-    id: String,
-    key: String,
-    status: &'static str,
-    started: Instant,
-    error: Option<String>,
-    task_ids: Vec<String>,
-}
+struct ApiError(StatusCode, &'static str);
 
-pub struct AppState {
-    pub cfg: Config,
-    pub store: RwLock<Store>,
-    jobs: Mutex<HashMap<String, Job>>,
-    gate: Semaphore,
-    counter: AtomicU64,
-}
-
-pub type Shared = Arc<AppState>;
-
-type ApiResult<T> = Result<Json<T>, (StatusCode, Json<Value>)>;
-
-fn err(code: StatusCode, msg: &str) -> (StatusCode, Json<Value>) {
-    (code, Json(json!({ "error": msg })))
-}
-
-fn sha256_file(p: &FsPath) -> std::io::Result<String> {
-    let bytes = std::fs::read(p)?;
-    Ok(format!("{:x}", Sha256::digest(bytes)))
-}
-
-fn read_jsonl(p: &FsPath) -> Result<Vec<Value>, String> {
-    let raw = std::fs::read_to_string(p).map_err(|e| format!("{}: {e}", p.display()))?;
-    raw.lines()
-        .filter(|l| !l.trim().is_empty())
-        .map(|l| serde_json::from_str::<Value>(l).map_err(|e| format!("{}: {e}", p.display())))
-        .collect()
-}
-
-/// Allowlisted public projection: only schema-listed keys ever leave the server.
-pub fn project_public(task: &Value) -> Value {
-    let mut out = serde_json::Map::new();
-    for k in PUBLIC_KEYS {
-        if let Some(v) = task.get(k) {
-            out.insert(k.to_string(), v.clone());
-        }
-    }
-    Value::Object(out)
-}
-
-fn valid_image_name(name: &str) -> bool {
-    name.len() == 23
-        && name.starts_with("im_")
-        && name.ends_with(".png")
-        && name[3..19]
-            .bytes()
-            .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
-}
-
-/// Validate a worker output directory: manifest present, well-formed, every listed hash matches,
-/// and every referenced image is listed. Returns the problems found.
-pub fn verify_worker_output(root: &FsPath) -> Result<(), String> {
-    let raw = std::fs::read_to_string(root.join("manifest.json"))
-        .map_err(|e| format!("manifest missing: {e}"))?;
-    let m: Value = serde_json::from_str(&raw).map_err(|e| format!("manifest malformed: {e}"))?;
-    let files = m
-        .get("files")
-        .and_then(|v| v.as_object())
-        .ok_or("manifest malformed: no files object")?;
-    for (rel, h) in files {
-        if rel.contains("..") || rel.starts_with('/') || rel.contains('\\') {
-            return Err(format!("manifest path escapes root: {rel}"));
-        }
-        let want = h.as_str().ok_or("manifest hash not a string")?;
-        let got = sha256_file(&root.join(rel)).map_err(|e| format!("{rel}: {e}"))?;
-        if got != want {
-            return Err(format!("hash mismatch for {rel}"));
-        }
-    }
-    for t in read_jsonl(&root.join("tasks.jsonl"))? {
-        let img = t["image"].as_str().ok_or("task without image")?;
-        if !files.contains_key(img) {
-            return Err(format!("image {img} not covered by manifest"));
-        }
-    }
-    Ok(())
-}
-
-impl Store {
-    /// Load one data root (samples layout or dataset layout). Pass `validate=true` for worker output.
-    pub fn load_root(&mut self, root: &FsPath, validate: bool) -> Result<Vec<String>, String> {
-        if validate {
-            verify_worker_output(root)?;
-        }
-        let mut task_files = vec![root.join("tasks.jsonl")];
-        if let Ok(rd) = std::fs::read_dir(root.join("public")) {
-            task_files.extend(
-                rd.flatten()
-                    .map(|e| e.path())
-                    .filter(|p| p.extension().is_some_and(|x| x == "jsonl")),
-            );
-        }
-        let mut ids = vec![];
-        for f in task_files.into_iter().filter(|f| f.exists()) {
-            for t in read_jsonl(&f)? {
-                let id = t["task_id"]
-                    .as_str()
-                    .ok_or("task without task_id")?
-                    .to_string();
-                let img = t["image"].as_str().ok_or("task without image")?;
-                let name = img.rsplit('/').next().unwrap_or("");
-                if !valid_image_name(name) {
-                    return Err(format!("task {id}: bad image name"));
-                }
-                let path = root.join(img);
-                if !path.is_file()
-                    || std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0) > MAX_IMAGE_BYTES
-                {
-                    return Err(format!("task {id}: image missing or too large"));
-                }
-                self.images.insert(name.to_string(), path);
-                self.tasks.insert(id.clone(), project_public(&t));
-                ids.push(id);
-                if self.tasks.len() > MAX_TASKS {
-                    return Err("too many tasks".into());
-                }
-            }
-        }
-        for kf in [
-            root.join("sample_keys.jsonl"),
-            root.join("private").join("answers.jsonl"),
-        ] {
-            if kf.exists() {
-                for k in read_jsonl(&kf)? {
-                    if let Some(id) = k["task_id"].as_str() {
-                        self.keys.insert(id.to_string(), k.clone());
-                    }
-                }
-            }
-        }
-        if root.join("pairs.jsonl").exists() {
-            self.pairs.extend(read_jsonl(&root.join("pairs.jsonl"))?);
-        }
-        if root.join("model_attempts.jsonl").exists() {
-            for a in read_jsonl(&root.join("model_attempts.jsonl"))? {
-                if let Some(id) = a["task_id"].as_str() {
-                    self.model_attempts
-                        .entry(id.to_string())
-                        .or_default()
-                        .push(a.clone());
-                }
-            }
-        }
-        Ok(ids)
+impl IntoResponse for ApiError {
+    fn into_response(self) -> Response {
+        (self.0, Json(json!({ "error": self.1 }))).into_response()
     }
 }
 
-pub fn new_state(cfg: Config) -> Result<Shared, String> {
-    let mut store = Store::default();
-    if cfg.data_dir.exists() {
-        store.load_root(&cfg.data_dir, false)?;
-    }
-    Ok(Arc::new(AppState {
-        cfg,
-        store: RwLock::new(store),
-        jobs: Mutex::new(HashMap::new()),
-        gate: Semaphore::new(1),
-        counter: AtomicU64::new(0),
-    }))
+async fn health(State(state): State<AppState>) -> Result<Json<Value>, ApiError> {
+    sqlx::query("SELECT 1")
+        .execute(&state.db)
+        .await
+        .map_err(|_| ApiError(StatusCode::SERVICE_UNAVAILABLE, "database_unavailable"))?;
+    Ok(Json(json!({ "status": "ok", "schema_version": "1.0.0" })))
 }
 
-pub fn build_app(state: Shared) -> Router {
-    let origins: Vec<header::HeaderValue> = state
-        .cfg
-        .allowed_origins
-        .iter()
-        .filter_map(|o| o.parse().ok())
-        .collect();
-    let cors = tower_http::cors::CorsLayer::new()
-        .allow_origin(origins)
-        .allow_methods([axum::http::Method::GET, axum::http::Method::POST])
-        .allow_headers([header::CONTENT_TYPE, "x-panelproof-token".parse().unwrap()]);
-    Router::new()
-        .route("/health", get(health))
-        .route("/v1/capabilities", get(capabilities))
-        .route("/v1/tasks", get(list_tasks))
-        .route("/v1/tasks/:id", get(get_task))
-        .route("/v1/tasks/:id/model-attempts", get(model_attempts))
-        .route("/v1/tasks/:id/reveal", post(reveal))
-        .route("/v1/images/:name", get(image))
-        .route("/v1/arena/pairs", get(arena_pairs))
-        .route("/v1/attempts", post(post_attempt))
-        .route("/v1/jobs/generate", post(start_job))
-        .route("/v1/jobs/:id", get(get_job))
-        .layer(DefaultBodyLimit::max(MAX_BODY))
-        .layer(cors)
-        .with_state(state)
-}
-
-async fn health(State(s): State<Shared>) -> Json<Value> {
-    let n = s.store.read().await.tasks.len();
-    Json(
-        json!({ "status": "ok", "service": "pp-api", "version": env!("CARGO_PKG_VERSION"), "tasks_loaded": n }),
-    )
-}
-
-async fn capabilities(State(s): State<Shared>) -> Json<Value> {
+async fn capabilities(State(state): State<AppState>) -> Json<Value> {
     Json(json!({
-        "schema_version": pp_oracle::SCHEMA_VERSION,
-        "conditions": ["C0", "C1", "C3"],
-        "offline_demo": true,
-        "live_models": false,
-        "reveal_enabled": s.cfg.reveal_token.is_some(),
-        "generation": { "max_count": s.cfg.max_count, "deadline_seconds": s.cfg.job_deadline.as_secs() },
-        "limits": { "max_body_bytes": MAX_BODY, "max_tasks": MAX_TASKS },
-        "interim": "fixture service; PP-14 owns the production API"
+        "mode": "local_import",
+        "schema_version": "1.0.0",
+        "human_attempts": state.reveal_token.is_some(),
+        "dev_evidence_reveal": state.reveal_token.is_some(),
+        "generation_jobs": false,
+        "evaluation_jobs": false,
     }))
-}
-
-async fn list_tasks(State(s): State<Shared>) -> Json<Value> {
-    let st = s.store.read().await;
-    Json(Value::Array(st.tasks.values().take(500).cloned().collect()))
-}
-
-async fn get_task(State(s): State<Shared>, Path(id): Path<String>) -> ApiResult<Value> {
-    let st = s.store.read().await;
-    st.tasks
-        .get(&id)
-        .cloned()
-        .map(Json)
-        .ok_or_else(|| err(StatusCode::NOT_FOUND, "unknown task"))
-}
-
-async fn model_attempts(State(s): State<Shared>, Path(id): Path<String>) -> Json<Value> {
-    let st = s.store.read().await;
-    let rows: Vec<Value> = st
-        .model_attempts
-        .get(&id)
-        .cloned()
-        .unwrap_or_default()
-        .into_iter()
-        .take(3)
-        .collect();
-    Json(json!({ "task_id": id, "label": "DEMO ONLY", "attempts": rows }))
-}
-
-async fn image(State(s): State<Shared>, Path(name): Path<String>) -> Response {
-    if !valid_image_name(&name) {
-        return err(StatusCode::BAD_REQUEST, "bad image name").into_response();
-    }
-    let path = { s.store.read().await.images.get(&name).cloned() };
-    match path {
-        Some(p) => match tokio::fs::read(&p).await {
-            Ok(bytes) => (
-                [
-                    (header::CONTENT_TYPE, "image/png"),
-                    (header::CACHE_CONTROL, "public, max-age=3600"),
-                ],
-                bytes,
-            )
-                .into_response(),
-            Err(_) => err(StatusCode::NOT_FOUND, "image unavailable").into_response(),
-        },
-        None => err(StatusCode::NOT_FOUND, "unknown image").into_response(),
-    }
-}
-
-async fn arena_pairs(State(s): State<Shared>) -> Json<Value> {
-    // only opaque pair ids and task ids: the variant kind is revealed with the evidence
-    let st = s.store.read().await;
-    Json(Value::Array(
-        st.pairs
-            .iter()
-            .map(|p| json!({ "pair_id": p["pair_id"], "task_ids": p["task_ids"] }))
-            .collect(),
-    ))
 }
 
 #[derive(Deserialize)]
-struct AttemptIn {
-    task_id: String,
-    response: Value,
+#[serde(deny_unknown_fields)]
+struct TaskQuery {
+    cursor: Option<String>,
+    limit: Option<usize>,
 }
 
-async fn post_attempt(State(s): State<Shared>, Json(a): Json<AttemptIn>) -> ApiResult<Value> {
-    let mut st = s.store.write().await;
-    if !st.tasks.contains_key(&a.task_id) {
-        return Err(err(StatusCode::NOT_FOUND, "unknown task"));
+#[derive(Serialize)]
+struct TaskPage {
+    items: Vec<PublicTask>,
+    next_cursor: Option<String>,
+}
+
+async fn list_tasks(
+    State(state): State<AppState>,
+    Query(query): Query<TaskQuery>,
+) -> Result<Json<TaskPage>, ApiError> {
+    let limit = query.limit.unwrap_or(25);
+    if !(1..=100).contains(&limit) || query.cursor.as_deref().is_some_and(|id| !valid_id(id)) {
+        return Err(ApiError(StatusCode::BAD_REQUEST, "invalid_pagination"));
     }
-    let key = st
-        .keys
-        .get(&a.task_id)
-        .ok_or_else(|| err(StatusCode::CONFLICT, "no reference for task"))?;
-    let outcome = pp_scoring::score(&key["answer"], &a.response);
-    let id = format!("a_{}", s.counter.fetch_add(1, Ordering::SeqCst) + 1);
-    let rec = json!({ "attempt_id": id, "task_id": a.task_id, "outcome": outcome.as_str(), "status": "ok", "human": true });
-    st.attempts.push(rec.clone());
-    Ok(Json(rec))
+    let mut items: Vec<_> = state
+        .tasks
+        .values()
+        .filter(|entry| {
+            query
+                .cursor
+                .as_ref()
+                .is_none_or(|cursor| &entry.public.task_id > cursor)
+        })
+        .take(limit + 1)
+        .map(|entry| entry.public.clone())
+        .collect();
+    let next_cursor = if items.len() > limit {
+        items.truncate(limit);
+        items.last().map(|entry| entry.task_id.clone())
+    } else {
+        None
+    };
+    Ok(Json(TaskPage { items, next_cursor }))
+}
+
+fn get_task<'a>(state: &'a AppState, id: &str) -> Result<&'a Task, ApiError> {
+    if !valid_id(id) {
+        return Err(ApiError(StatusCode::BAD_REQUEST, "invalid_task_id"));
+    }
+    state
+        .tasks
+        .get(id)
+        .ok_or(ApiError(StatusCode::NOT_FOUND, "task_not_found"))
+}
+
+async fn task(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<PublicTask>, ApiError> {
+    Ok(Json(get_task(&state, &id)?.public.clone()))
+}
+
+async fn image(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Response, ApiError> {
+    get_task(&state, &id)?;
+    let png = tokio::task::spawn_blocking(move || state.tasks[&id].read_image())
+        .await
+        .ok()
+        .and_then(Result::ok)
+        .ok_or(ApiError(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "image_unavailable",
+        ))?;
+    Ok((
+        [
+            (header::CONTENT_TYPE, HeaderValue::from_static("image/png")),
+            (
+                header::X_CONTENT_TYPE_OPTIONS,
+                HeaderValue::from_static("nosniff"),
+            ),
+        ],
+        png,
+    )
+        .into_response())
+}
+
+fn authorized_task<'a>(
+    state: &'a AppState,
+    headers: &HeaderMap,
+    id: &str,
+) -> Result<&'a Task, ApiError> {
+    let task = get_task(state, id)?;
+    let token = headers
+        .get(header::AUTHORIZATION)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.strip_prefix("Bearer "));
+    let permitted = state
+        .reveal_token
+        .as_deref()
+        .zip(token)
+        .is_some_and(|(expected, token)| bool::from(expected.as_bytes().ct_eq(token.as_bytes())));
+    if !permitted || !task.supports_demo() {
+        return Err(ApiError(StatusCode::FORBIDDEN, "demo_evidence_unavailable"));
+    }
+    Ok(task)
+}
+
+#[derive(Serialize)]
+struct Reveal<'a> {
+    task_id: &'a str,
+    answer: &'a Answer,
+    tolerance_milli: Option<i64>,
+    evidence_regions: Option<&'a [EvidenceRegion]>,
+    solver_version: &'a str,
 }
 
 async fn reveal(
-    State(s): State<Shared>,
-    headers: HeaderMap,
+    State(state): State<AppState>,
     Path(id): Path<String>,
-) -> ApiResult<Value> {
-    let want = s
-        .cfg
-        .reveal_token
-        .as_deref()
-        .ok_or_else(|| err(StatusCode::FORBIDDEN, "reveal disabled"))?;
-    let got = headers
-        .get("x-panelproof-token")
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("");
-    if got != want {
-        return Err(err(StatusCode::FORBIDDEN, "reveal not authorized"));
-    }
-    let st = s.store.read().await;
-    let key = st
-        .keys
-        .get(&id)
-        .ok_or_else(|| err(StatusCode::NOT_FOUND, "no reference for task"))?;
-    Ok(Json(json!({
-        "task_id": id,
-        "answer": key["answer"],
-        "variant_kind": key.get("variant_kind"),
-        "skill": key.get("skill"),
-        "kind": key.get("kind"),
-        "evidence": key.get("evidence"),
-        "validation": key.get("validation"),
-    })))
+    headers: HeaderMap,
+) -> Result<Response, ApiError> {
+    let task = authorized_task(&state, &headers, &id)?;
+    Ok((
+        [(header::CACHE_CONTROL, HeaderValue::from_static("no-store"))],
+        Json(Reveal {
+            task_id: &id,
+            answer: task.answer(),
+            tolerance_milli: task.tolerance_milli(),
+            evidence_regions: task.evidence(),
+            solver_version: task.solver_version(),
+        }),
+    )
+        .into_response())
 }
 
 #[derive(Deserialize)]
-struct JobIn {
-    seed: String,
-    count: u32,
-    #[serde(default = "default_difficulty")]
-    difficulty: String,
+#[serde(deny_unknown_fields)]
+struct AttemptInput {
+    task_id: String,
+    answer: Answer,
 }
 
-fn default_difficulty() -> String {
-    "medium".to_string()
+#[derive(Serialize)]
+struct AttemptResult {
+    task_id: String,
+    correct: bool,
 }
 
-pub fn valid_seed(seed: &str) -> bool {
-    !seed.is_empty()
-        && seed.len() <= 40
-        && seed
-            .bytes()
-            .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
-}
+const DB_ERROR: ApiError = ApiError(StatusCode::SERVICE_UNAVAILABLE, "database_unavailable");
 
-async fn start_job(State(s): State<Shared>, Json(j): Json<JobIn>) -> ApiResult<Value> {
-    if !valid_seed(&j.seed)
-        || j.count == 0
-        || j.count > s.cfg.max_count
-        || !matches!(j.difficulty.as_str(), "easy" | "medium" | "hard")
-    {
-        return Err(err(StatusCode::BAD_REQUEST, "invalid seed or count"));
+async fn attempt(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(input): Json<AttemptInput>,
+) -> Result<Response, ApiError> {
+    let task = authorized_task(&state, &headers, &input.task_id)?;
+    let key = headers
+        .get("idempotency-key")
+        .and_then(|value| value.to_str().ok())
+        .filter(|id| valid_id(id))
+        .ok_or(ApiError(StatusCode::BAD_REQUEST, "invalid_idempotency_key"))?;
+    if !valid_answer(&input.answer) {
+        return Err(ApiError(StatusCode::UNPROCESSABLE_ENTITY, "invalid_answer"));
     }
-    let key = format!("{}:{}:{}", j.seed, j.count, j.difficulty);
-    let id;
-    {
-        let mut jobs = s.jobs.lock().await;
-        if let Some(existing) = jobs.values().find(|x| x.key == key && x.status != "failed") {
-            return Ok(Json(job_json(existing, true)));
-        }
-        id = format!("j_{}", s.counter.fetch_add(1, Ordering::SeqCst) + 1);
-        jobs.insert(
-            id.clone(),
-            Job {
-                id: id.clone(),
-                key,
-                status: "queued",
-                started: Instant::now(),
-                error: None,
-                task_ids: vec![],
-            },
-        );
+    let correct = answers_match(task.answer(), &input.answer, task.tolerance_milli())
+        .map_err(|_| ApiError(StatusCode::UNPROCESSABLE_ENTITY, "invalid_answer"))?;
+    let answer = serde_json::to_string(&input.answer)
+        .map_err(|_| ApiError(StatusCode::UNPROCESSABLE_ENTITY, "invalid_answer"))?;
+    let mut transaction = state.db.begin().await.map_err(|_| DB_ERROR)?;
+    let inserted = sqlx::query(
+        "INSERT INTO human_attempts (task_fingerprint, task_id, idempotency_key, submitted_answer, correct)
+         VALUES (?, ?, ?, ?, ?) ON CONFLICT(task_fingerprint, idempotency_key) DO NOTHING",
+    ).bind(&task.fingerprint).bind(&input.task_id).bind(key).bind(&answer).bind(correct)
+        .execute(&mut *transaction).await.map_err(|_| DB_ERROR)?.rows_affected() == 1;
+    let (stored_answer, stored_correct): (String, bool) = sqlx::query_as(
+        "SELECT submitted_answer, correct FROM human_attempts WHERE task_fingerprint = ? AND idempotency_key = ?",
+    ).bind(&task.fingerprint).bind(key).fetch_one(&mut *transaction).await.map_err(|_| DB_ERROR)?;
+    transaction.commit().await.map_err(|_| DB_ERROR)?;
+    if stored_answer != answer {
+        return Err(ApiError(StatusCode::CONFLICT, "idempotency_key_reused"));
     }
-    let st = s.clone();
-    let (jid, seed, count, difficulty) =
-        (id.clone(), j.seed.clone(), j.count, j.difficulty.clone());
-    tokio::spawn(async move { run_job(st, jid, seed, count, difficulty).await });
-    let jobs = s.jobs.lock().await;
-    Ok(Json(job_json(&jobs[&id], false)))
-}
-
-async fn run_job(s: Shared, id: String, seed: String, count: u32, difficulty: String) {
-    let _permit = s.gate.acquire().await.expect("semaphore open");
-    set_job(&s, &id, "running", None, vec![]).await;
-    let out = s.cfg.runs_dir.join("jobs").join(&id);
-    let mut cmd = tokio::process::Command::new(&s.cfg.python);
-    cmd.args(["-m", "panelproof.cli", "factory", "--seed"])
-        .arg(&seed)
-        .args(["--count"])
-        .arg(count.to_string())
-        .args(["--out"])
-        .arg(&out)
-        .args(["--difficulty"])
-        .arg(&difficulty)
-        .env("PYTHONPATH", s.cfg.repo_root.join("python").join("src"))
-        .kill_on_drop(true)
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::piped());
-    let res = tokio::time::timeout(s.cfg.job_deadline, async {
-        let child = cmd.spawn().map_err(|e| format!("spawn failed: {e}"))?;
-        let o = child.wait_with_output().await.map_err(|e| e.to_string())?;
-        if o.status.success() {
-            Ok(())
-        } else {
-            let tail = String::from_utf8_lossy(&o.stderr);
-            Err(format!(
-                "worker exited with {}: {}",
-                o.status,
-                tail.chars()
-                    .rev()
-                    .take(300)
-                    .collect::<String>()
-                    .chars()
-                    .rev()
-                    .collect::<String>()
-            ))
-        }
-    })
-    .await;
-    match res {
-        Err(_) => set_job(&s, &id, "failed", Some("deadline exceeded".into()), vec![]).await,
-        Ok(Err(e)) => set_job(&s, &id, "failed", Some(e), vec![]).await,
-        Ok(Ok(())) => {
-            let loaded = s.store.write().await.load_root(&out, true);
-            match loaded {
-                Ok(ids) => set_job(&s, &id, "succeeded", None, ids).await,
-                Err(e) => {
-                    set_job(
-                        &s,
-                        &id,
-                        "failed",
-                        Some(format!("rejected worker output: {e}")),
-                        vec![],
-                    )
-                    .await
-                }
-            }
-        }
-    }
-}
-
-async fn set_job(
-    s: &Shared,
-    id: &str,
-    status: &'static str,
-    error: Option<String>,
-    ids: Vec<String>,
-) {
-    if let Some(j) = s.jobs.lock().await.get_mut(id) {
-        j.status = status;
-        j.error = error;
-        j.task_ids = ids;
-    }
-}
-
-fn job_json(j: &Job, duplicate: bool) -> Value {
-    json!({ "job_id": j.id, "status": j.status, "error": j.error, "task_ids": j.task_ids, "duplicate_of_existing": duplicate })
-}
-
-async fn get_job(State(s): State<Shared>, Path(id): Path<String>) -> ApiResult<Value> {
-    let mut jobs = s.jobs.lock().await;
-    let j = jobs
-        .get_mut(&id)
-        .ok_or_else(|| err(StatusCode::NOT_FOUND, "unknown job"))?;
-    // stale recovery: a job stuck past twice its deadline is failed so it can be re-requested
-    if (j.status == "running" || j.status == "queued")
-        && j.started.elapsed() > s.cfg.job_deadline * 2 + Duration::from_secs(30)
-    {
-        j.status = "failed";
-        j.error = Some("stale job recovered".into());
-    }
-    Ok(Json(job_json(j, false)))
+    let status = if inserted {
+        StatusCode::CREATED
+    } else {
+        StatusCode::OK
+    };
+    Ok((
+        status,
+        [(header::CACHE_CONTROL, HeaderValue::from_static("no-store"))],
+        Json(AttemptResult {
+            task_id: input.task_id,
+            correct: stored_correct,
+        }),
+    )
+        .into_response())
 }

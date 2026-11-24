@@ -16,11 +16,12 @@ from pathlib import Path
 from typing import Any
 
 from .demo_adapter import mock_attempts_for_rows
-from .interim_questions import answer_from_trace, answers_agree, build_questions, response_schema
-from .interim_rules import public_rules_text
+from .export import VARIANT_TO_CONTRACT, contract_evidence
 from .mutations import make_nuisance, make_semantic_flip
+from .question_bridge import answer_from_trace, answers_agree, build_questions, response_schema
 from .render import evidence_annotations, png_bytes, render_scene
 from .scene import Scene, generate_scene, load_config
+from .schemas import SCHEMA_VERSION, PrivateTask, PublicTask
 from .validate import compare_trace_to_scene
 from .verify import verify_png
 
@@ -64,6 +65,7 @@ def run_factory(seed: str, count: int, out: Path, difficulty: str = "medium") ->
         shutil.rmtree(out)
     (out / "images").mkdir(parents=True)
     tasks: list[dict[str, Any]] = []
+    contract: list[dict[str, Any]] = []
     keys: list[dict[str, Any]] = []
     traces: dict[str, dict[str, Any]] = {}
     pairs: list[dict[str, Any]] = []
@@ -80,15 +82,37 @@ def run_factory(seed: str, count: int, out: Path, difficulty: str = "medium") ->
         (out / img).write_bytes(png)
         tid = "t_" + _hid(seed, scene.scene_id, kind, pump_id)
         tasks.append(
-            {
-                "schema_version": "1.0.0",
-                "task_id": tid,
-                "image": img,
-                "question": q.text,
-                "rules": public_rules_text(),
-                "response_schema": response_schema(q),
-                "set": "factory",
-            }
+            PublicTask.model_validate(
+                {
+                    "schema_version": SCHEMA_VERSION,
+                    "task_id": tid,
+                    "image_path": img,
+                    "question": q.text,
+                    "public_rules": q.public_rules,
+                    "response_schema": response_schema(q),
+                }
+            ).model_dump(mode="json")
+        )
+        ans = {k: v for k, v in q.answer.items() if k != "tolerance_milli"}
+        contract.append(
+            PrivateTask.model_validate(
+                {
+                    "schema_version": SCHEMA_VERSION,
+                    "task_id": tid,
+                    "base_scene_id": scene.scene_id,
+                    "group_id": _hid(seed, scene.seed.rsplit(":", 2)[-2], "grp"),
+                    "variant_kind": VARIANT_TO_CONTRACT[vk if vk != "base" else "base"],
+                    "split": "dev",
+                    "skill": q.contract_skill,
+                    "difficulty": {"band": difficulty},
+                    "answer": ans,
+                    "tolerance_milli": q.answer.get("tolerance_milli") if ans["kind"] == "numeric" else None,
+                    "evidence_regions": contract_evidence(evidence_annotations(scene), pump_id) or None,
+                    "solver_version": f"pp-rules-{SCHEMA_VERSION}+{trace['verifier_version']}",
+                    "image_sha256": _sha(png),
+                    "validation_status": "accepted",
+                }
+            ).model_dump(mode="json")
         )
         tp = next(p for p in trace["pumps"] if p["pump_id"] == pump_id)
         keys.append(
@@ -144,11 +168,15 @@ def run_factory(seed: str, count: int, out: Path, difficulty: str = "medium") ->
             break
         if not done:
             raise RuntimeError(f"could not build a verified group for index {i}")
-    _jsonl(out / "tasks.jsonl", tasks)
-    _jsonl(out / "sample_keys.jsonl", keys)
-    _jsonl(out / "sample_validation.jsonl", [{"scene_id": k, "trace": v} for k, v in sorted(traces.items())])
-    _jsonl(out / "pairs.jsonl", pairs)
-    _jsonl(out / "model_attempts.jsonl", mock_attempts_for_rows(rows, traces))
+    (out / "public").mkdir()
+    (out / "private").mkdir()
+    # Shared-contract bundle (imported by the Axum API) plus web-demo extras.
+    _jsonl(out / "public" / "tasks.jsonl", sorted(tasks, key=lambda r: r["task_id"]))
+    _jsonl(out / "private" / "tasks.jsonl", sorted(contract, key=lambda r: r["task_id"]))
+    _jsonl(out / "private" / "keys.jsonl", keys)
+    _jsonl(out / "private" / "validation.jsonl", [{"scene_id": k, "trace": v} for k, v in sorted(traces.items())])
+    _jsonl(out / "public" / "pairs.jsonl", pairs)
+    _jsonl(out / "public" / "model_attempts.jsonl", mock_attempts_for_rows(rows, traces))
     files = {
         str(p.relative_to(out)).replace("\\", "/"): _sha(p.read_bytes()) for p in sorted(out.rglob("*")) if p.is_file()
     }

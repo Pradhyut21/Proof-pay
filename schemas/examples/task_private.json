@@ -1,0 +1,43 @@
+{
+  "schema_version": "1.0.0",
+  "task_id": "pp-cda853c47f4a",
+  "base_scene_id": "scene-1",
+  "group_id": "scene-1",
+  "variant_kind": "original",
+  "split": "dev",
+  "skill": "operational_state",
+  "difficulty": {
+    "tier": "baseline",
+    "pump_count": 1
+  },
+  "answer": {
+    "kind": "category",
+    "value": "NORMAL"
+  },
+  "evidence_regions": [
+    {
+      "instrument_id": "P1-inlet",
+      "x": 40,
+      "y": 72,
+      "width": 160,
+      "height": 160
+    },
+    {
+      "instrument_id": "P1-outlet",
+      "x": 236,
+      "y": 72,
+      "width": 160,
+      "height": 160
+    },
+    {
+      "instrument_id": "P1-run",
+      "x": 420,
+      "y": 72,
+      "width": 48,
+      "height": 48
+    }
+  ],
+  "solver_version": "pump-rules-1",
+  "image_sha256": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+  "validation_status": "pending"
+}

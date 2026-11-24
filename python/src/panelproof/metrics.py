@@ -22,7 +22,7 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
 
-from .interim_questions import score_answer
+from .question_bridge import score_answer
 
 CORE_CONDITIONS = ("C0", "C1", "C3")
 OK_STATUS = "ok"
@@ -386,13 +386,32 @@ def main_metrics(argv: list[str]) -> int:
     ap.add_argument(
         "--split", default=None, help="comma list of splits to include, e.g. dev or frozen_main,frozen_heldout_style"
     )
+    ap.add_argument(
+        "--attempt-format",
+        choices=("demo", "contract"),
+        default="demo",
+        help="demo: rows from `demo-attempts`; contract: attempts.jsonl written by `python -m panelproof.evaluate`",
+    )
+    ap.add_argument("--rust-pp", default=None, help="path to the Rust `pp` binary: cross-check scoring against it")
     ap.add_argument("--measured", action="store_true", help="require dataset freeze + access approval")
     ap.add_argument("--approval", default=None, help="JSON with selection_hash and approved_by (measured runs only)")
     a = ap.parse_args(argv)
     root = Path(a.tasks)
     tasks = load_tasks(root)
-    attempts = load_attempts(Path(a.attempts))
+    if a.attempt_format == "contract":
+        from .contract_attempts import load_contract_attempts
+
+        attempts = load_contract_attempts(Path(a.attempts))
+    else:
+        attempts = load_attempts(Path(a.attempts))
     rep = build_report(tasks, attempts, split=a.split)
+    if a.rust_pp:
+        from .contract_attempts import rust_parity
+
+        parity = rust_parity(tasks, attempts, executable=a.rust_pp)
+        rep["rust_scoring_parity"] = parity if parity is not None else {"status": "not run: pp binary not found"}
+        if parity and parity["mismatch_count"]:
+            raise RuntimeError(f"Rust scorer disagrees on {parity['mismatch_count']} attempts: {parity['mismatches'][:3]}")
     if a.measured:
         manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
         approval = json.loads(Path(a.approval).read_text(encoding="utf-8")) if a.approval else None

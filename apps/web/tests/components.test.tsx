@@ -16,24 +16,30 @@ afterEach(() => {
 const catTask: PublicTask = {
   schema_version: "1.0.0",
   task_id: "t1",
-  image: "images/t1.png",
+  image_path: "images/t1.png",
   question: "What is the pump state?",
-  rules: "RUN off means STOPPED.",
-  response_schema: { type: "category", allowed: ["NORMAL", "LOW_PRESSURE", "STOPPED"] },
-  set: "dev",
+  public_rules: "RUN off means STOPPED.",
+  response_schema: {
+    type: "object",
+    properties: {
+      kind: { type: "string", enum: ["category"] },
+      value: { type: "string", enum: ["NORMAL", "LOW_PRESSURE", "STOPPED"] },
+    },
+  },
 };
 const numTask: PublicTask = {
   ...catTask,
   task_id: "t2",
-  response_schema: { type: "numeric", unit: "kPa", scale: "milli" },
+  response_schema: {
+    type: "object",
+    properties: {
+      kind: { type: "string", enum: ["numeric"] },
+      value_milli: { type: "integer" },
+      unit: { type: "string", enum: ["kPa"] },
+    },
+  },
 };
 
-function mockFetch(impl: (url: string, init?: RequestInit) => Response | Promise<Response>) {
-  vi.stubGlobal(
-    "fetch",
-    vi.fn((url: string, init?: RequestInit) => Promise.resolve(impl(url, init))),
-  );
-}
 const jsonRes = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 
@@ -41,18 +47,37 @@ describe("QuestionForm", () => {
   it("validates before sending and shows an accessible error", async () => {
     const f = vi.fn();
     vi.stubGlobal("fetch", f);
-    render(<QuestionForm task={numTask} />);
+    render(<QuestionForm set="demo" task={numTask} />);
     await userEvent.click(screen.getByRole("button", { name: /submit answer/i }));
     expect(screen.getByRole("alert")).toHaveTextContent(/enter a number/i);
     expect(f).not.toHaveBeenCalled();
   });
 
-  it("submits a category answer and shows the outcome with text, not colour only", async () => {
-    mockFetch(() => jsonRes({ attempt_id: "a", task_id: "t1", outcome: "correct", status: "ok" }));
-    render(<QuestionForm task={catTask} />);
+  it("submits a tagged answer with an idempotency key and shows the verdict as text", async () => {
+    const f = vi.fn(() => Promise.resolve(jsonRes({ task_id: "t1", correct: true }, 201)));
+    vi.stubGlobal("fetch", f);
+    render(<QuestionForm set="demo" task={catTask} />);
     await userEvent.click(screen.getByRole("radio", { name: "NORMAL" }));
     await userEvent.click(screen.getByRole("button", { name: /submit answer/i }));
     await waitFor(() => expect(screen.getByTestId("outcome-correct")).toHaveTextContent("Correct"));
+    const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("/api/pp/demo/api/v1/attempts");
+    expect(JSON.parse(init.body as string)).toEqual({
+      task_id: "t1",
+      answer: { kind: "category", value: "NORMAL" },
+    });
+    expect((init.headers as Record<string, string>)["idempotency-key"]).toMatch(/^h-/);
+  });
+
+  it("shows an incorrect verdict", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.resolve(jsonRes({ task_id: "t1", correct: false }, 201))),
+    );
+    render(<QuestionForm set="demo" task={catTask} />);
+    await userEvent.click(screen.getByRole("radio", { name: "STOPPED" }));
+    await userEvent.click(screen.getByRole("button", { name: /submit answer/i }));
+    await waitFor(() => expect(screen.getByTestId("outcome-incorrect")).toBeInTheDocument());
   });
 
   it("reports offline when the API is unreachable", async () => {
@@ -60,7 +85,7 @@ describe("QuestionForm", () => {
       "fetch",
       vi.fn(() => Promise.reject(new TypeError("failed"))),
     );
-    render(<QuestionForm task={numTask} />);
+    render(<QuestionForm set="demo" task={numTask} />);
     await userEvent.type(screen.getByLabelText(/your answer/i), "540");
     await userEvent.click(screen.getByRole("button", { name: /submit answer/i }));
     await waitFor(() => expect(screen.getByTestId("outcome-offline")).toBeInTheDocument());
@@ -69,16 +94,18 @@ describe("QuestionForm", () => {
 
 describe("PanelViewer", () => {
   it("has alt text, zoom controls and draws evidence only when given", async () => {
-    const { rerender } = render(<PanelViewer task={catTask} label="Panel A" />);
+    const { rerender } = render(<PanelViewer set="demo" task={catTask} label="Panel A" />);
     expect(screen.getByRole("img")).toHaveAccessibleName(/control panel/i);
+    expect(screen.getByRole("img")).toHaveAttribute("src", "/api/pp/demo/api/v1/tasks/t1/image");
     expect(screen.queryAllByTestId("evidence-box")).toHaveLength(0);
     await userEvent.click(screen.getByRole("button", { name: /zoom in panel a/i }));
     expect(screen.getByText("150%")).toBeInTheDocument();
     rerender(
       <PanelViewer
+        set="demo"
         task={catTask}
         label="Panel A"
-        evidence={[{ pump: "P1", kind: "gauge", box: [10, 20, 110, 120] }]}
+        evidence={[{ instrument_id: "A_gauge_outlet", x: 10, y: 20, width: 100, height: 100 }]}
       />,
     );
     expect(screen.getAllByTestId("evidence-box")).toHaveLength(1);
@@ -105,7 +132,7 @@ describe("ModelAttempts", () => {
     const mk = (m: string) => ({
       task_id: "t1",
       model: m,
-      condition: "C0",
+      condition: "C1",
       status: "ok" as const,
       response: { kind: "category" as const, value: "NORMAL" },
     });

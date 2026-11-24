@@ -11,6 +11,7 @@ import { isValidSeed } from "@/lib/utils";
 import type { Difficulty, Job, PublicTask } from "@/lib/types";
 
 const POLL_MS = 1000;
+const MAX_COUNT = 4;
 
 export default function FactoryPage() {
   const [seed, setSeed] = useState("demo-1");
@@ -24,8 +25,9 @@ export default function FactoryPage() {
   useEffect(() => () => clearTimeout(timer.current), []);
 
   async function loadTasks(ids: string[]) {
-    const loaded = await Promise.all(ids.slice(0, 4).map((id) => api.getTask(id)));
-    setTasks(loaded);
+    const wanted = new Set(ids);
+    const page = await api.listTasks("factory");
+    setTasks(page.items.filter((t) => wanted.has(t.task_id)).slice(0, 4));
   }
 
   async function poll(id: string) {
@@ -51,8 +53,8 @@ export default function FactoryPage() {
       setError("Seed must be 1–40 characters: letters, digits, dash or underscore.");
       return;
     }
-    if (!Number.isInteger(n) || n < 1 || n > 20) {
-      setError("Count must be a whole number from 1 to 20.");
+    if (!Number.isInteger(n) || n < 1 || n > MAX_COUNT) {
+      setError(`Count must be a whole number from 1 to ${MAX_COUNT}.`);
       return;
     }
     try {
@@ -84,7 +86,7 @@ export default function FactoryPage() {
           </div>
           <div className="space-y-1">
             <label htmlFor="count" className="text-sm font-semibold">
-              Number of panels (1–20)
+              Number of panels (1–{MAX_COUNT})
             </label>
             <input
               id="count"
@@ -120,14 +122,14 @@ export default function FactoryPage() {
         </p>
       ) : null}
       {job ? <RunStatus status={job.status} error={job.error} /> : null}
-      {job?.duplicate_of_existing ? (
+      {job?.reused ? (
         <p className="text-sm">This seed was generated before; showing the existing tasks.</p>
       ) : null}
       <div className="grid gap-6 lg:grid-cols-2">
         {tasks.map((t, i) => (
           <Card key={t.task_id} className="space-y-4">
-            <PanelViewer task={t} label={`Panel ${i + 1}`} />
-            <QuestionForm task={t} />
+            <PanelViewer set="factory" task={t} label={`Panel ${i + 1}`} />
+            <QuestionForm set="factory" task={t} />
           </Card>
         ))}
       </div>

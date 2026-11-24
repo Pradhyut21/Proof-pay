@@ -1,21 +1,12 @@
 [workspace]
+members = ["crates/api", "crates/oracle", "crates/scoring"]
 resolver = "2"
-members = ["crates/oracle", "crates/scoring", "crates/api"]
 
 [workspace.package]
-version = "0.1.0"
 edition = "2021"
-license = "MIT"
+version = "0.1.0"
 
 [workspace.dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-sha2 = "0.10"
-axum = "0.7"
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "process", "time", "sync", "fs"] }
-tower-http = { version = "0.5", features = ["cors"] }
-tower = { version = "0.5", features = ["util"] }
-http-body-util = "0.1"
-
-[workspace.lints.rust]
-unsafe_code = "forbid"
+thiserror = "2"

@@ -1,0 +1,13 @@
+cff-version: 1.2.0
+message: "If you use PanelProof, please cite it as below."
+title: "PanelProof: a pixel-verified visual reasoning benchmark for fictional pump panels"
+type: software
+version: 0.1.0
+license: MIT
+repository-code: "https://github.com/Pradhyut21/Proof-pay"
+authors:
+  - alias: "Pradhyut21"
+  - alias: "kishansaaai"
+abstract: >-
+  Synthetic evaluation of whether vision-language models can read gauges, associate them with the correct pump,
+  apply explicit rules and respond to controlled visual changes. All panels are fictional and synthetic.

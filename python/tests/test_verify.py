@@ -22,7 +22,7 @@ def v(**kw):
 def test_verifier_imports_nothing_from_generator():
     tree = ast.parse(SRC.read_text(encoding="utf-8"))
     mods = {n.module for n in ast.walk(tree) if isinstance(n, ast.ImportFrom) and n.level == 1}
-    assert not (mods & {"scene", "render", "mutations", "validate", "interim_questions", "cli", "export"}), mods
+    assert not (mods & {"scene", "render", "mutations", "validate", "question_bridge", "cli", "export"}), mods
 
 
 def test_manual_fixture_reads_exact_ticks():

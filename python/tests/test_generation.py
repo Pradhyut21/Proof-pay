@@ -5,7 +5,6 @@ import struct
 import time
 
 from panelproof.cli import generate_dataset
-from panelproof.interim_rules import THRESHOLD_MKPA
 from panelproof.mutations import (
     make_missing,
     make_nuisance,
@@ -14,6 +13,7 @@ from panelproof.mutations import (
     validate_variant,
 )
 from panelproof.render import check_layout, png_bytes, render_scene
+from panelproof.rule_bridge import THRESHOLD_MKPA
 from panelproof.scene import generate_scene
 from panelproof.units import convert_milli, from_milli_kpa, round_half_away, to_milli_kpa
 

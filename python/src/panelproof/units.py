@@ -1,37 +1,31 @@
-"""Fixed-point unit conversion (INTERIM shim for #4; reads shared/units.json)."""
+"""Fixed-point unit helpers for the generator, verifier and metrics.
+
+All conversion arithmetic is delegated to the shared contract in ``rules.py`` (factors from
+``shared/units.json``, round to nearest, ties away from zero), so every component agrees on one table.
+"""
 
 from __future__ import annotations
 
-import json
 from fractions import Fraction
-from functools import lru_cache
 from pathlib import Path
+
+from .rules import _pressure_factors, _rounded
+
+round_half_away = _rounded
 
 
 def repo_root() -> Path:
     return Path(__file__).resolve().parents[3]
 
 
-@lru_cache(maxsize=1)
-def unit_table() -> dict[str, Fraction]:
-    raw = json.loads((repo_root() / "shared" / "units.json").read_text(encoding="utf-8"))
-    return {k: Fraction(v["num"], v["den"]) for k, v in raw["units"].items()}
-
-
-def round_half_away(x: Fraction) -> int:
-    """Round to nearest integer, ties away from zero."""
-    n, d = x.numerator, x.denominator
-    q, r = divmod(abs(n) * 2 + d, d * 2)
-    return q if n >= 0 else -q
-
-
 def to_milli_kpa(value_milli: int, unit: str) -> int:
-    return round_half_away(Fraction(value_milli) * unit_table()[unit])
+    return _rounded(Fraction(value_milli) * _pressure_factors()[unit])
 
 
 def from_milli_kpa(mkpa: int, unit: str) -> int:
-    return round_half_away(Fraction(mkpa) / unit_table()[unit])
+    return _rounded(Fraction(mkpa) / _pressure_factors()[unit])
 
 
 def convert_milli(value_milli: int, src: str, dst: str) -> int:
-    return round_half_away(Fraction(value_milli) * unit_table()[src] / unit_table()[dst])
+    factors = _pressure_factors()
+    return _rounded(Fraction(value_milli) * factors[src] / factors[dst])

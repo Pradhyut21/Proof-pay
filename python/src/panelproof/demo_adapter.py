@@ -15,8 +15,8 @@ import random
 from pathlib import Path
 from typing import Any
 
-from .interim_questions import UNIT_ORDER
-from .interim_rules import pump_state
+from .question_bridge import UNIT_ORDER
+from .rule_bridge import pump_state
 from .units import convert_milli, from_milli_kpa, to_milli_kpa
 
 MODEL = "demo-offline-mock"
@@ -60,7 +60,7 @@ def _answer(
     if k == "state":
         return {"kind": "category", "value": state}
     exp = state == "LOW_PRESSURE"
-    return {"kind": "category", "value": "CONSISTENT" if rd["alarm"] == exp else "INCONSISTENT"}
+    return {"kind": "category", "value": "CONSISTENT" if rd["alarm"] == exp else "CONTRADICTION"}
 
 
 def _prior(task: dict[str, Any], rng: random.Random) -> dict[str, Any]:
@@ -68,7 +68,7 @@ def _prior(task: dict[str, Any], rng: random.Random) -> dict[str, Any]:
     if k == "state":
         return {"kind": "category", "value": rng.choice(["STOPPED", "NORMAL", "LOW_PRESSURE"])}
     if k == "consistency":
-        return {"kind": "category", "value": rng.choice(["CONSISTENT", "INCONSISTENT"])}
+        return {"kind": "category", "value": rng.choice(["CONSISTENT", "CONTRADICTION"])}
     unit = task["target_unit"] or "kPa"
     scale = {"kPa": 300_000, "bar": 3000, "psi": 45_000}[unit if unit in UNIT_ORDER else "kPa"]
     return {"kind": "numeric", "value_milli": rng.randrange(0, 2 * scale), "unit": unit}

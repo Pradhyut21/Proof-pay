@@ -22,7 +22,7 @@ test("judge flow: generate -> view -> answer -> compare -> reveal", async ({ pag
   // Counterfactual pair compare + a human attempt + reveal.
   await page.goto("/arena");
   await expect(page.getByTestId("variant-compare").locator("figure")).toHaveCount(2);
-  await page.getByRole("radio", { name: "NORMAL" }).first().check();
+  await page.getByRole("radio").first().check();
   await page.getByRole("button", { name: "Submit answer" }).first().click();
   await expect(page.locator('[data-testid^="outcome-"]').first()).toBeVisible();
   await expect(page.getByText(/DEMO ONLY/).first()).toBeVisible();
@@ -39,7 +39,7 @@ test("judge flow: generate -> view -> answer -> compare -> reveal", async ({ pag
 });
 
 test("offline state is explicit when the API is unreachable", async ({ page }) => {
-  await page.route("http://127.0.0.1:8787/**", (r) => r.abort());
+  await page.route("**/api/**", (r) => r.abort());
   await page.goto("/arena");
   await expect(page.getByTestId("arena-offline")).toBeVisible();
 });
