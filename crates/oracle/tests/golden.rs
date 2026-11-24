@@ -1,44 +1,56 @@
-use pp_oracle::{convert_milli, pump_state, to_milli_kpa};
-use serde_json::Value;
+use panelproof_oracle::{
+    convert_to_milli_kpa, verify_equipment, Consistency, Equipment, Pressure, PressureUnit,
+    PumpState, MAX_SAFE_INTEGER,
+};
+use serde::Deserialize;
 
-fn golden() -> Value {
-    let raw = include_str!("../../../shared/golden/pump_rules.json");
-    serde_json::from_str(raw).expect("golden parses")
+#[derive(Deserialize)]
+struct Golden {
+    id: String,
+    inlet: Pressure,
+    outlet: Pressure,
+    run: bool,
+    alarm: bool,
+    expected_state: PumpState,
+    expected_consistency: Consistency,
 }
 
 #[test]
-fn pump_rule_goldens_match() {
-    let g = golden();
-    let cases = g["pump_rules"].as_array().unwrap();
-    assert!(cases.len() >= 20);
-    for c in cases {
-        let id = c["id"].as_str().unwrap();
-        let unit = |k: &str| {
-            let v = &c[k];
-            to_milli_kpa(
-                v["value_milli"].as_i64().unwrap(),
-                v["unit"].as_str().unwrap(),
-            )
-            .unwrap()
-        };
-        let (i, o) = (unit("inlet"), unit("outlet"));
-        assert_eq!(i, c["inlet_mkpa"].as_i64().unwrap(), "{id} inlet");
-        assert_eq!(o, c["outlet_mkpa"].as_i64().unwrap(), "{id} outlet");
-        assert_eq!(o - i, c["delta_mkpa"].as_i64().unwrap(), "{id} delta");
-        let s = pump_state(c["run"].as_bool().unwrap(), i, o);
-        assert_eq!(s.as_str(), c["state"].as_str().unwrap(), "{id} state");
-    }
-}
-
-#[test]
-fn unit_conversion_goldens_match() {
-    for c in golden()["units"].as_array().unwrap() {
-        let got = convert_milli(
-            c["value_milli"].as_i64().unwrap(),
-            c["from"].as_str().unwrap(),
-            c["to"].as_str().unwrap(),
-        )
+fn all_shared_rule_fixtures_agree() {
+    let fixtures: Vec<Golden> =
+        serde_json::from_str(include_str!("../../../shared/golden/pump_rules.json")).unwrap();
+    assert!(fixtures.len() >= 20);
+    for fixture in fixtures {
+        let verified = verify_equipment(&Equipment {
+            label: fixture.id.clone(),
+            id: fixture.id.clone(),
+            inlet: fixture.inlet,
+            outlet: fixture.outlet,
+            run: fixture.run,
+            alarm: fixture.alarm,
+        })
         .unwrap();
-        assert_eq!(got, c["expect"].as_i64().unwrap(), "{c}");
+        assert_eq!(verified.state, fixture.expected_state, "{}", fixture.id);
+        assert_eq!(
+            verified.consistency, fixture.expected_consistency,
+            "{}",
+            fixture.id
+        );
     }
+}
+
+#[test]
+fn fixed_point_pressure_handles_signs_and_rejects_unsafe_input() {
+    for (value_milli, expected) in [(1, 7), (-1, -7), (1_000, 6_895), (-1_000, -6_895)] {
+        let pressure = Pressure {
+            value_milli,
+            unit: PressureUnit::Psi,
+        };
+        assert_eq!(convert_to_milli_kpa(pressure).unwrap(), expected);
+    }
+    assert!(convert_to_milli_kpa(Pressure {
+        value_milli: MAX_SAFE_INTEGER + 1,
+        unit: PressureUnit::Bar,
+    })
+    .is_err());
 }

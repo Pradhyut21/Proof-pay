@@ -1,18 +1,21 @@
 import type {
+  Answer,
   AttemptResult,
-  Capabilities,
+  DatasetSet,
   Difficulty,
-  Health,
   Job,
-  ModelAttemptsResponse,
+  ModelAttempt,
   Pair,
   PublicTask,
   Reveal,
+  TaskPage,
 } from "./types";
 
-export const API_BASE = process.env.NEXT_PUBLIC_PP_API ?? "http://127.0.0.1:8787";
-const REVEAL_TOKEN = process.env.NEXT_PUBLIC_PP_REVEAL_TOKEN ?? "local-dev";
-
+/**
+ * All calls are same-origin: `/api/pp/<set>/...` is a server-side proxy to the local Axum API (it adds the
+ * dev-only bearer token, so the token never reaches the browser); `/api/jobs` and `/api/extras` are small
+ * server routes for the generation worker and the demo fixture files.
+ */
 export type ApiErrorKind = "offline" | "timeout" | "http";
 
 export class ApiError extends Error {
@@ -30,7 +33,7 @@ async function request<T>(path: string, init: RequestInit = {}, timeoutMs = 8000
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), timeoutMs);
   try {
-    const res = await fetch(`${API_BASE}${path}`, { ...init, signal: ctl.signal });
+    const res = await fetch(path, { ...init, signal: ctl.signal, cache: "no-store" });
     if (!res.ok) {
       let detail = res.statusText;
       try {
@@ -38,6 +41,10 @@ async function request<T>(path: string, init: RequestInit = {}, timeoutMs = 8000
         detail = body.error ?? detail;
       } catch {
         /* keep status text */
+      }
+      // 502/503 from the proxy means the upstream API is not running.
+      if (res.status === 502 || res.status === 503) {
+        throw new ApiError(detail, "offline", res.status);
       }
       throw new ApiError(detail, "http", res.status);
     }
@@ -53,31 +60,45 @@ async function request<T>(path: string, init: RequestInit = {}, timeoutMs = 8000
   }
 }
 
-const json = (body: unknown): RequestInit => ({
-  method: "POST",
-  headers: { "content-type": "application/json" },
-  body: JSON.stringify(body),
-});
+const pp = (set: DatasetSet, p: string) => `/api/pp/${set}/${p}`;
 
-export const imageUrl = (imagePath: string): string =>
-  `${API_BASE}/v1/images/${imagePath.split("/").pop() ?? ""}`;
+export const imageUrl = (set: DatasetSet, taskId: string): string =>
+  pp(set, `api/v1/tasks/${encodeURIComponent(taskId)}/image`);
+
+function newKey(): string {
+  const rand =
+    globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  return `h-${rand}`.slice(0, 80);
+}
+
+const jsonHeaders = { "content-type": "application/json" };
 
 export const api = {
-  health: () => request<Health>("/health"),
-  capabilities: () => request<Capabilities>("/v1/capabilities"),
-  listTasks: () => request<PublicTask[]>("/v1/tasks"),
-  getTask: (id: string) => request<PublicTask>(`/v1/tasks/${encodeURIComponent(id)}`),
-  listPairs: () => request<Pair[]>("/v1/arena/pairs"),
-  modelAttempts: (id: string) =>
-    request<ModelAttemptsResponse>(`/v1/tasks/${encodeURIComponent(id)}/model-attempts`),
-  postAttempt: (taskId: string, response: unknown) =>
-    request<AttemptResult>("/v1/attempts", json({ task_id: taskId, response })),
-  reveal: (id: string) =>
-    request<Reveal>(`/v1/tasks/${encodeURIComponent(id)}/reveal`, {
+  health: (set: DatasetSet = "demo") => request<{ status: string }>(pp(set, "healthz")),
+  listTasks: (set: DatasetSet, cursor?: string) =>
+    request<TaskPage>(
+      pp(set, `api/v1/tasks?limit=100${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`),
+    ),
+  getTask: (set: DatasetSet, id: string) =>
+    request<PublicTask>(pp(set, `api/v1/tasks/${encodeURIComponent(id)}`)),
+  postAttempt: (set: DatasetSet, taskId: string, answer: Answer) =>
+    request<AttemptResult>(pp(set, "api/v1/attempts"), {
       method: "POST",
-      headers: { "x-panelproof-token": REVEAL_TOKEN },
+      headers: { ...jsonHeaders, "idempotency-key": newKey() },
+      body: JSON.stringify({ task_id: taskId, answer }),
     }),
+  reveal: (set: DatasetSet, id: string) =>
+    request<Reveal>(pp(set, `api/v1/tasks/${encodeURIComponent(id)}/reveal`), {
+      method: "POST",
+    }),
+  listPairs: (set: DatasetSet) => request<Pair[]>(`/api/extras/${set}/pairs`),
+  modelAttempts: (set: DatasetSet, taskId: string) =>
+    request<ModelAttempt[]>(`/api/extras/${set}/attempts/${encodeURIComponent(taskId)}`),
   startJob: (seed: string, count: number, difficulty: Difficulty) =>
-    request<Job>("/v1/jobs/generate", json({ seed, count, difficulty })),
-  getJob: (id: string) => request<Job>(`/v1/jobs/${encodeURIComponent(id)}`),
+    request<Job>(
+      "/api/jobs",
+      { method: "POST", headers: jsonHeaders, body: JSON.stringify({ seed, count, difficulty }) },
+      15000,
+    ),
+  getJob: (id: string) => request<Job>(`/api/jobs/${encodeURIComponent(id)}`),
 };

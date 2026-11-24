@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "Pressure": {
+      "additionalProperties": false,
+      "properties": {
+        "value_milli": {
+          "maximum": 9007199254740991,
+          "minimum": -9007199254740991,
+          "title": "Value Milli",
+          "type": "integer"
+        },
+        "unit": {
+          "enum": [
+            "kPa",
+            "bar",
+            "psi"
+          ],
+          "title": "Unit",
+          "type": "string"
+        }
+      },
+      "required": [
+        "value_milli",
+        "unit"
+      ],
+      "title": "Pressure",
+      "type": "object"
+    },
+    "Pump": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "maxLength": 160,
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        },
+        "inlet": {
+          "$ref": "#/$defs/Pressure"
+        },
+        "outlet": {
+          "$ref": "#/$defs/Pressure"
+        },
+        "run": {
+          "title": "Run",
+          "type": "boolean"
+        },
+        "alarm": {
+          "title": "Alarm",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "label",
+        "inlet",
+        "outlet",
+        "run",
+        "alarm"
+      ],
+      "title": "Pump",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "base_scene_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$",
+      "title": "Base Scene Id",
+      "type": "string"
+    },
+    "seed": {
+      "maximum": 9007199254740991,
+      "minimum": 0,
+      "title": "Seed",
+      "type": "integer"
+    },
+    "layout_family": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$",
+      "title": "Layout Family",
+      "type": "string"
+    },
+    "style_family": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$",
+      "title": "Style Family",
+      "type": "string"
+    },
+    "equipment": {
+      "items": {
+        "$ref": "#/$defs/Pump"
+      },
+      "maxItems": 2,
+      "minItems": 1,
+      "title": "Equipment",
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema_version",
+    "base_scene_id",
+    "seed",
+    "layout_family",
+    "style_family",
+    "equipment"
+  ],
+  "title": "Scene",
+  "type": "object"
+}

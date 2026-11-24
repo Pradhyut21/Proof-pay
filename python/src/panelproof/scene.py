@@ -14,8 +14,8 @@ from typing import Any
 
 import yaml
 
-from . import SCHEMA_VERSION
-from .interim_rules import THRESHOLD_MKPA, expected_alarm, pump_state
+from .rule_bridge import THRESHOLD_MKPA, expected_alarm, pump_state
+from .schemas import SCHEMA_VERSION
 from .units import repo_root, to_milli_kpa
 
 CANVAS_W, CANVAS_H = 1280, 960

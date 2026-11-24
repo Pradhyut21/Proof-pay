@@ -88,11 +88,33 @@ def _one(args: tuple[str, dict, str]) -> tuple[str, str, list[str]]:
     return axis, "verified_wrong" if wrong else "rejected", reasons
 
 
+def _base_scenes(root: Path, limit: int) -> list[tuple[str, dict[str, Any]]]:
+    """Original (unedited) base scenes of a bundle as (png path, scene dict).
+
+    A bundle does not store scene truth; it is regenerated from the private per-task seed, which is deterministic.
+    """
+    from .scene import generate_scene, load_config
+
+    cfg = load_config()
+    seen: set[str] = set()
+    out: list[tuple[str, dict[str, Any]]] = []
+    for line in (root / "private" / "answers.jsonl").read_text(encoding="utf-8").splitlines():
+        r = json.loads(line)
+        if r.get("variant_edit") is not None or r["variant_kind"] != "base" or r["scene_id"] in seen:
+            continue
+        seen.add(r["scene_id"])
+        scene = generate_scene(r["seed"], cfg)
+        if scene.scene_id != r["scene_id"]:
+            raise RuntimeError(f"scene {r['scene_id']} does not regenerate from its seed")
+        out.append((str(root / r["image"]), scene.to_dict()))
+        if len(out) >= limit:
+            break
+    return out
+
+
 def run_perturbations(root: Path, limit: int = 60, workers: int = 4) -> dict[str, Any]:
-    recs = [json.loads(line) for line in (root / "private" / "scenes.jsonl").read_text(encoding="utf-8").splitlines()][
-        :limit
-    ]
-    jobs = [(str(root / "images" / f"{r['scene_id']}.png"), r["scene"], ax) for r in recs for ax in AXES]
+    scenes = _base_scenes(root, limit)
+    jobs = [(img, scene, ax) for img, scene in scenes for ax in AXES]
     with ProcessPoolExecutor(max_workers=workers) as ex:
         res = list(ex.map(_one, jobs, chunksize=8))
     by: dict[str, Counter] = defaultdict(Counter)
@@ -110,4 +132,4 @@ def run_perturbations(root: Path, limit: int = 60, workers: int = 4) -> dict[str
             "false_accept_rate": round(by[ax]["verified_wrong"] / n, 3),
             "top_rejection_reasons": dict(why[ax].most_common(3)),
         }
-    return {"scenes": len(recs), "axes": table}
+    return {"scenes": len(scenes), "axes": table}

@@ -11,8 +11,8 @@ import random
 from dataclasses import dataclass, field
 from typing import Any
 
-from .interim_rules import THRESHOLD_MKPA, pump_state
 from .render import THEMES
+from .rule_bridge import THRESHOLD_MKPA, pump_state
 from .scene import Gauge, Scene, load_config, place_glare, scene_from_dict
 from .units import to_milli_kpa
 

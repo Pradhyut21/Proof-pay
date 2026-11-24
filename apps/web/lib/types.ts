@@ -1,32 +1,55 @@
-/** Typed projection of the local API contract (schema 1.0.0). Public types never carry answers. */
+/** Typed projection of the shared PanelProof contract (schemas/*.json, schema 1.0.0). */
 
-export type ResponseSchema =
-  | { type: "category"; allowed: string[] }
-  | { type: "numeric"; unit: string; scale: "milli"; note?: string };
+export type DatasetSet = "demo" | "factory";
 
 export interface PublicTask {
   schema_version: string;
   task_id: string;
-  image: string;
+  image_path: string;
   question: string;
-  rules: string;
-  response_schema: ResponseSchema;
-  set: string;
+  public_rules: string;
+  /** JSON Schema describing the tagged answer the task accepts. */
+  response_schema: Record<string, unknown>;
 }
 
 export type Answer =
   | { kind: "category"; value: string }
-  | { kind: "numeric"; value_milli: number; unit: string; tolerance_milli?: number };
+  | { kind: "numeric"; value_milli: number; unit: string }
+  | { kind: "set"; values: string[] };
 
-export type AttemptOutcome = "correct" | "incorrect" | "invalid";
-/** UI-level outcome: server outcomes plus client-observed transport failures. */
-export type DisplayOutcome = AttemptOutcome | "timeout" | "offline";
+/** What the form needs, derived from a task's response_schema. */
+export type ResponseSpec =
+  | { type: "category"; allowed: string[] }
+  | { type: "numeric"; units: string[] }
+  | { type: "unsupported" };
+
+export interface TaskPage {
+  items: PublicTask[];
+  next_cursor?: string | null;
+}
 
 export interface AttemptResult {
-  attempt_id: string;
   task_id: string;
-  outcome: AttemptOutcome;
-  status: "ok";
+  correct: boolean;
+}
+
+/** UI-level outcome: server verdict plus client-observed transport failures. */
+export type DisplayOutcome = "correct" | "incorrect" | "invalid" | "timeout" | "offline";
+
+export interface EvidenceRegion {
+  instrument_id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface Reveal {
+  task_id: string;
+  answer: Answer;
+  tolerance_milli: number | null;
+  evidence_regions: EvidenceRegion[] | null;
+  solver_version: string;
 }
 
 export interface Pair {
@@ -41,29 +64,6 @@ export interface ModelAttempt {
   status: "ok" | "parse_error" | "timeout" | "provider_error";
   response: Answer | null;
   label?: string;
-  latency_ms?: number;
-}
-
-export interface ModelAttemptsResponse {
-  task_id: string;
-  label: string;
-  attempts: ModelAttempt[];
-}
-
-export interface EvidenceBox {
-  pump: string;
-  kind: string;
-  box: [number, number, number, number];
-  needle_tip?: [number, number];
-}
-
-export interface Reveal {
-  task_id: string;
-  answer: Answer;
-  variant_kind?: string | null;
-  skill?: string;
-  kind?: string;
-  evidence?: EvidenceBox[];
 }
 
 export type JobStatus = "queued" | "running" | "succeeded" | "failed";
@@ -74,23 +74,12 @@ export interface Job {
   status: JobStatus;
   error: string | null;
   task_ids: string[];
-  duplicate_of_existing: boolean;
+  reused: boolean;
 }
 
 export interface Health {
   status: string;
-  service: string;
-  version: string;
-  tasks_loaded: number;
-}
-
-export interface Capabilities {
-  schema_version: string;
-  conditions: string[];
-  offline_demo: boolean;
-  live_models: boolean;
-  reveal_enabled: boolean;
-  generation: { max_count: number; deadline_seconds: number };
+  schema_version?: string;
 }
 
 export const IMAGE_WIDTH = 1280;

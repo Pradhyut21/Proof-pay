@@ -3,7 +3,7 @@ dataset_version: "0.1.0"
 generator_config: configs/generator.yaml
 base_seed: "pp-freeze-v1"       # private: namespace for frozen-set scenes; never published with answers
 pilot_seed: "pp-pilot-v1"       # pilot scenes are generated under a different namespace and excluded from the freeze
-base_groups: 75                 # target accepted base groups
+base_groups: 110                # target accepted base groups
 max_attempts: 160
 dev_fraction: 0.20              # of all groups, by group; held-out style groups go to the frozen side
 heldout_theme: teal             # style family reserved for the frozen held-out slice

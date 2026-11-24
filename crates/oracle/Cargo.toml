@@ -1,13 +1,9 @@
 [package]
-name = "pp-oracle"
-version.workspace = true
+name = "panelproof-oracle"
 edition.workspace = true
-license.workspace = true
-description = "PanelProof fixed-point units and pump rules (interim; PP-08 owns the full independent oracle)"
+version.workspace = true
 
 [dependencies]
 serde.workspace = true
 serde_json.workspace = true
-
-[lints]
-workspace = true
+thiserror.workspace = true

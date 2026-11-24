@@ -3,18 +3,25 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { imageUrl } from "@/lib/api";
-import { IMAGE_HEIGHT, IMAGE_WIDTH, type EvidenceBox, type PublicTask } from "@/lib/types";
+import {
+  IMAGE_HEIGHT,
+  IMAGE_WIDTH,
+  type DatasetSet,
+  type EvidenceRegion,
+  type PublicTask,
+} from "@/lib/types";
 
 const ZOOMS = [1, 1.5, 2, 3];
 
 interface Props {
+  set: DatasetSet;
   task: PublicTask;
   label: string;
-  evidence?: EvidenceBox[];
+  evidence?: EvidenceRegion[] | null;
 }
 
 /** Panel image with zoom. Evidence boxes are drawn only when the backend has revealed them. */
-export function PanelViewer({ task, label, evidence }: Props) {
+export function PanelViewer({ set, task, label, evidence }: Props) {
   const [zoom, setZoom] = useState(1);
   const idx = ZOOMS.indexOf(zoom);
   return (
@@ -54,23 +61,23 @@ export function PanelViewer({ task, label, evidence }: Props) {
         <div className="relative" style={{ width: `${zoom * 100}%` }}>
           {/* eslint-disable-next-line @next/next/no-img-element -- local API image, intrinsic size known */}
           <img
-            src={imageUrl(task.image)}
+            src={imageUrl(set, task.task_id)}
             alt={`${label}: synthetic water-pump control panel with two dials and RUN and ALARM lamps`}
             width={IMAGE_WIDTH}
             height={IMAGE_HEIGHT}
             className="block h-auto w-full"
           />
-          {evidence?.map((e, i) => (
+          {evidence?.map((e) => (
             <div
-              key={`${e.kind}-${i}`}
+              key={e.instrument_id}
               data-testid="evidence-box"
-              title={`${e.pump} ${e.kind}`}
+              title={e.instrument_id}
               className="pointer-events-none absolute border-2 border-dashed border-primary"
               style={{
-                left: `${(e.box[0] / IMAGE_WIDTH) * 100}%`,
-                top: `${(e.box[1] / IMAGE_HEIGHT) * 100}%`,
-                width: `${((e.box[2] - e.box[0]) / IMAGE_WIDTH) * 100}%`,
-                height: `${((e.box[3] - e.box[1]) / IMAGE_HEIGHT) * 100}%`,
+                left: `${(e.x / IMAGE_WIDTH) * 100}%`,
+                top: `${(e.y / IMAGE_HEIGHT) * 100}%`,
+                width: `${(e.width / IMAGE_WIDTH) * 100}%`,
+                height: `${(e.height / IMAGE_HEIGHT) * 100}%`,
               }}
             />
           ))}

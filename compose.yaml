@@ -1,0 +1,25 @@
+# Optional. Offline demo: API on the committed data/demo bundle plus the web UI. No credentials, no network at run time.
+#   docker compose up --build        then open http://127.0.0.1:3000
+# The Task Factory (generation jobs) needs Python and the Rust binary inside the web container and is not wired here.
+services:
+  api:
+    build: { context: ., dockerfile: infra/docker/api.Dockerfile }
+    command: ["/data/demo", "/state/demo.sqlite", "0.0.0.0:3001"]
+    environment:
+      PANELPROOF_REVEAL_TOKEN: ${PANELPROOF_REVEAL_TOKEN:-local-dev-token-0123}
+    volumes:
+      - ./data/demo:/data/demo:ro
+      - api-state:/state
+    ports: ["127.0.0.1:3001:3001"]
+  web:
+    build: { context: ., dockerfile: infra/docker/web.Dockerfile }
+    environment:
+      PP_API_DEMO: http://api:3001
+      PANELPROOF_REVEAL_TOKEN: ${PANELPROOF_REVEAL_TOKEN:-local-dev-token-0123}
+      PP_DEMO_DIR: /data/demo
+    volumes:
+      - ./data/demo:/data/demo:ro
+    depends_on: [api]
+    ports: ["127.0.0.1:3000:3000"]
+volumes:
+  api-state: {}

@@ -1,0 +1,166 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "JsonValue": {},
+    "Resolution": {
+      "additionalProperties": false,
+      "properties": {
+        "width": {
+          "maximum": 9007199254740991,
+          "minimum": 1,
+          "title": "Width",
+          "type": "integer"
+        },
+        "height": {
+          "maximum": 9007199254740991,
+          "minimum": 1,
+          "title": "Height",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "width",
+        "height"
+      ],
+      "title": "Resolution",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "run_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$",
+      "title": "Run Id",
+      "type": "string"
+    },
+    "model_id": {
+      "maxLength": 160,
+      "minLength": 1,
+      "title": "Model Id",
+      "type": "string"
+    },
+    "provider": {
+      "maxLength": 160,
+      "minLength": 1,
+      "title": "Provider",
+      "type": "string"
+    },
+    "condition": {
+      "enum": [
+        "C0",
+        "C1",
+        "C2",
+        "C3",
+        "C4"
+      ],
+      "title": "Condition",
+      "type": "string"
+    },
+    "prompt_version": {
+      "maxLength": 160,
+      "minLength": 1,
+      "title": "Prompt Version",
+      "type": "string"
+    },
+    "seed": {
+      "maximum": 9007199254740991,
+      "minimum": 0,
+      "title": "Seed",
+      "type": "integer"
+    },
+    "max_calls": {
+      "maximum": 9007199254740991,
+      "minimum": 0,
+      "title": "Max Calls",
+      "type": "integer"
+    },
+    "selected_task_ids_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Selected Task Ids Sha256",
+      "type": "string"
+    },
+    "environment_fingerprint": {
+      "maxLength": 4096,
+      "minLength": 1,
+      "title": "Environment Fingerprint",
+      "type": "string"
+    },
+    "demo_only": {
+      "title": "Demo Only",
+      "type": "boolean"
+    },
+    "model_revision": {
+      "anyOf": [
+        {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Model Revision"
+    },
+    "resolution": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Resolution"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "sampling_parameters": {
+      "anyOf": [
+        {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Sampling Parameters"
+    },
+    "max_cost_usd": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Max Cost Usd"
+    }
+  },
+  "required": [
+    "schema_version",
+    "run_id",
+    "model_id",
+    "provider",
+    "condition",
+    "prompt_version",
+    "seed",
+    "max_calls",
+    "selected_task_ids_sha256",
+    "environment_fingerprint",
+    "demo_only"
+  ],
+  "title": "Run",
+  "type": "object"
+}

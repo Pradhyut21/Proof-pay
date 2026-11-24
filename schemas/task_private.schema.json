@@ -1,0 +1,318 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "CategoryAnswer": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "category",
+          "title": "Kind",
+          "type": "string"
+        },
+        "value": {
+          "maxLength": 160,
+          "minLength": 1,
+          "title": "Value",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "title": "CategoryAnswer",
+      "type": "object"
+    },
+    "EvidenceRegion": {
+      "additionalProperties": false,
+      "properties": {
+        "instrument_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$",
+          "title": "Instrument Id",
+          "type": "string"
+        },
+        "x": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "X",
+          "type": "integer"
+        },
+        "y": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Y",
+          "type": "integer"
+        },
+        "width": {
+          "maximum": 9007199254740991,
+          "minimum": 1,
+          "title": "Width",
+          "type": "integer"
+        },
+        "height": {
+          "maximum": 9007199254740991,
+          "minimum": 1,
+          "title": "Height",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "instrument_id",
+        "x",
+        "y",
+        "width",
+        "height"
+      ],
+      "title": "EvidenceRegion",
+      "type": "object"
+    },
+    "JsonValue": {},
+    "NumericAnswer": {
+      "additionalProperties": false,
+      "properties": {
+        "value_milli": {
+          "maximum": 9007199254740991,
+          "minimum": -9007199254740991,
+          "title": "Value Milli",
+          "type": "integer"
+        },
+        "unit": {
+          "enum": [
+            "kPa",
+            "bar",
+            "psi"
+          ],
+          "title": "Unit",
+          "type": "string"
+        },
+        "kind": {
+          "const": "numeric",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "value_milli",
+        "unit",
+        "kind"
+      ],
+      "title": "NumericAnswer",
+      "type": "object"
+    },
+    "SetAnswer": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "set",
+          "title": "Kind",
+          "type": "string"
+        },
+        "values": {
+          "items": {
+            "maxLength": 160,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 32,
+          "title": "Values",
+          "type": "array",
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "kind",
+        "values"
+      ],
+      "title": "SetAnswer",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "task_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$",
+      "title": "Task Id",
+      "type": "string"
+    },
+    "base_scene_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$",
+      "title": "Base Scene Id",
+      "type": "string"
+    },
+    "group_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$",
+      "title": "Group Id",
+      "type": "string"
+    },
+    "variant_kind": {
+      "enum": [
+        "original",
+        "semantic",
+        "semantic_preserve",
+        "nonsemantic",
+        "evidence_removed"
+      ],
+      "title": "Variant Kind",
+      "type": "string"
+    },
+    "split": {
+      "enum": [
+        "dev",
+        "test_frozen",
+        "diagnostic_abstain",
+        "real_slice"
+      ],
+      "title": "Split",
+      "type": "string"
+    },
+    "skill": {
+      "enum": [
+        "reading",
+        "conversion",
+        "association",
+        "difference",
+        "operational_state",
+        "indicator_consistency"
+      ],
+      "title": "Skill",
+      "type": "string"
+    },
+    "difficulty": {
+      "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+      },
+      "title": "Difficulty",
+      "type": "object"
+    },
+    "answer": {
+      "discriminator": {
+        "mapping": {
+          "category": "#/$defs/CategoryAnswer",
+          "numeric": "#/$defs/NumericAnswer",
+          "set": "#/$defs/SetAnswer"
+        },
+        "propertyName": "kind"
+      },
+      "oneOf": [
+        {
+          "$ref": "#/$defs/CategoryAnswer"
+        },
+        {
+          "$ref": "#/$defs/NumericAnswer"
+        },
+        {
+          "$ref": "#/$defs/SetAnswer"
+        }
+      ],
+      "title": "Answer"
+    },
+    "tolerance_milli": {
+      "anyOf": [
+        {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Tolerance Milli"
+    },
+    "evidence_regions": {
+      "anyOf": [
+        {
+          "items": {
+            "$ref": "#/$defs/EvidenceRegion"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Evidence Regions"
+    },
+    "solver_version": {
+      "maxLength": 160,
+      "minLength": 1,
+      "title": "Solver Version",
+      "type": "string"
+    },
+    "image_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Image Sha256",
+      "type": "string"
+    },
+    "validation_status": {
+      "enum": [
+        "pending",
+        "accepted",
+        "rejected"
+      ],
+      "title": "Validation Status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "task_id",
+    "base_scene_id",
+    "group_id",
+    "variant_kind",
+    "split",
+    "skill",
+    "difficulty",
+    "answer",
+    "solver_version",
+    "image_sha256",
+    "validation_status"
+  ],
+  "title": "PrivateTask",
+  "type": "object",
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "variant_kind": {
+            "const": "evidence_removed"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "split": {
+            "const": "diagnostic_abstain"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "answer": {
+            "properties": {
+              "kind": {
+                "const": "numeric"
+              }
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "tolerance_milli": {
+            "type": "null"
+          }
+        }
+      }
+    }
+  ]
+}

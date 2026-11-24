@@ -21,7 +21,7 @@ import cv2
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
-from .interim_rules import THRESHOLD_MKPA
+from .rule_bridge import THRESHOLD_MKPA
 from .units import to_milli_kpa
 
 VERIFIER_VERSION = "1.0.0"

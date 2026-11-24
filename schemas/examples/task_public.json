@@ -1,0 +1,27 @@
+{
+  "schema_version": "1.0.0",
+  "task_id": "pp-cda853c47f4a",
+  "image_path": "images/pp-cda853c47f4a.png",
+  "question": "What is the operating state of Pump A?",
+  "public_rules": "If RUN is off, the state is STOPPED. If RUN is on and outlet minus inlet pressure is at least 300 kPa, the state is NORMAL. Otherwise the state is LOW_PRESSURE.",
+  "response_schema": {
+    "type": "object",
+    "properties": {
+      "kind": {
+        "const": "category"
+      },
+      "value": {
+        "enum": [
+          "STOPPED",
+          "NORMAL",
+          "LOW_PRESSURE"
+        ]
+      }
+    },
+    "required": [
+      "kind",
+      "value"
+    ],
+    "additionalProperties": false
+  }
+}

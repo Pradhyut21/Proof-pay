@@ -1,0 +1,23 @@
+{
+  "schema_version": "1.0.0",
+  "base_scene_id": "scene-1",
+  "seed": 42,
+  "layout_family": "single_pump",
+  "style_family": "contrast",
+  "equipment": [
+    {
+      "id": "P1",
+      "label": "Pump A",
+      "inlet": {
+        "value_milli": 100000,
+        "unit": "kPa"
+      },
+      "outlet": {
+        "value_milli": 4000,
+        "unit": "bar"
+      },
+      "run": true,
+      "alarm": false
+    }
+  ]
+}

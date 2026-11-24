@@ -2,7 +2,6 @@ import json
 
 import pytest
 
-from panelproof.interim_questions import numeric
 from panelproof.metrics import (
     bootstrap_ci,
     build_report,
@@ -11,6 +10,7 @@ from panelproof.metrics import (
     selection_hash,
     summarize,
 )
+from panelproof.question_bridge import numeric
 
 
 def task(tid, kind="state", answer=None, group="g1", pair=None, vk="base", skill="M", diff="easy"):

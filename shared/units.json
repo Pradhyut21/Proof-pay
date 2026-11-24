@@ -1,9 +1,16 @@
 {
-  "schema_version": "1.0.0",
-  "note": "INTERIM shim for #4: factor = exact rational (num/den) kPa per 1 display unit. Values are fixed-point thousandths. Normalize to milli-kPa rounding to nearest, ties away from zero.",
-  "units": {
-    "kPa": {"num": 1, "den": 1},
-    "bar": {"num": 100, "den": 1},
-    "psi": {"num": 6894757293168, "den": 1000000000000}
+  "pressure": {
+    "kPa": {
+      "numerator": 1,
+      "denominator": 1
+    },
+    "bar": {
+      "numerator": 100,
+      "denominator": 1
+    },
+    "psi": {
+      "numerator": 6894757293168,
+      "denominator": 1000000000000
+    }
   }
 }

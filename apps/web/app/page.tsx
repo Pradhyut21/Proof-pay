@@ -4,22 +4,16 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { api } from "@/lib/api";
-import type { Capabilities, Health } from "@/lib/types";
 
 export default function HomePage() {
-  const [health, setHealth] = useState<Health>();
-  const [caps, setCaps] = useState<Capabilities>();
+  const [ready, setReady] = useState(false);
   const [offline, setOffline] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([api.health(), api.capabilities()])
-      .then(([h, c]) => {
-        if (!cancelled) {
-          setHealth(h);
-          setCaps(c);
-        }
-      })
+    api
+      .health("demo")
+      .then(() => !cancelled && setReady(true))
       .catch(() => !cancelled && setOffline(true));
     return () => {
       cancelled = true;
@@ -40,18 +34,13 @@ export default function HomePage() {
         </h2>
         {offline ? (
           <p role="alert" className="font-semibold text-danger" data-testid="api-offline">
-            ⛔ The local API is not reachable. Start it with <code>cargo run -p pp-api</code> and
-            reload.
+            ⛔ The local API is not reachable. Start it with{" "}
+            <code>cargo run -p panelproof-api -- data/demo data/demo.sqlite</code> and reload.
           </p>
-        ) : health && caps ? (
+        ) : ready ? (
           <ul className="list-inside list-disc" data-testid="api-ready">
-            <li>
-              ✓ {health.service} v{health.version}, {health.tasks_loaded} tasks loaded
-            </li>
-            <li>
-              Offline demo outputs: {caps.offline_demo ? "available (DEMO ONLY)" : "not available"}
-            </li>
-            <li>Live models: {caps.live_models ? "enabled" : "disabled in this build"}</li>
+            <li>✓ Local API healthy (demo dataset)</li>
+            <li>Model outputs shown here are offline simulations labelled DEMO ONLY</li>
           </ul>
         ) : (
           <p>Checking…</p>
