@@ -1,6 +1,6 @@
 # PanelProof dataset card
 
-The reference public build is v0.1.0 and its results are in `docs/results/dataset_report.json`. Its manifest is `a6d884a665c069da96facc90189922660a474f8cba9085a8af1a004b88fe2d00`. The v0.2 exporter validates same-question counterfactual pairs and distinguishes a public reproducibility build from a privately seeded holdout. [Current holdout workflow](../README.md)
+The reference public build is v0.1.0. Its manifest is `a6d884a665c069da96facc90189922660a474f8cba9085a8af1a004b88fe2d00`. The v0.2 exporter validates same-question counterfactual pairs and distinguishes a public reproducibility build from a privately seeded holdout. [Public build report](results/dataset_report.json) · [Current holdout workflow](reproducibility.md#build-a-private-evaluation-holdout)
 
 ## Historical public build
 

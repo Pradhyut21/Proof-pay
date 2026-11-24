@@ -3,9 +3,9 @@
 The evaluation runner uses released public task records. It writes one `attempts.jsonl` row per selected task and a `run.json` manifest. The default `demo` adapter emits a fixed `NORMAL` answer. Its outputs are **DEMO ONLY** for testing the pipeline.
 
 ```sh
-uv run --project python python -m panelproof.evaluate \
-  --tasks datasets/generated/v1/public/tasks.jsonl \
-  --asset-root datasets/generated/v1 --condition C1 --dry-run
+uv run --project python --python 3.11 --locked python -m panelproof.evaluate \
+  --tasks data/demo/public/tasks.jsonl \
+  --asset-root data/demo --condition C1 --dry-run
 ```
 
 Remove `--dry-run` to write a run under `results/runs/`. C0 sends the question, public rules, and response schema. C1 also sends the bytes from the task PNG. The adapter gets only those four public fields. The runner refuses PNGs with metadata or unsupported chunks, oversized files, and paths outside the artifact root. The selection order is deterministic from `--seed` and public task IDs.

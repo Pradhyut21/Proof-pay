@@ -1,4 +1,4 @@
-# Judge audit (self-audit)
+# Judge audit
 
 The historical self-audit follows the fresh source review and records the baseline that prompted the fixes.
 
@@ -14,7 +14,7 @@ A separate coding-agent session reviewed the readiness changes using the PRD rub
 | Measured results accepted incomplete cohorts or input changes under the same task IDs | The measured gate requires an exact matched C0/C1/C3 cohort and verifies each run's prompt and image commitments against the approved holdout. [Evaluation conditions](../evals/conditions.md#measured-runs-need-a-freeze) |
 | A change in display tolerance suppressed preserving-pair invariance for identical answers | Pair invariance compares values and units. Each task's correctness still uses its own tolerance. |
 
-The review identified two layout families and CLI reports as current scope. Live-model findings, completed human judgments, and the timed final rehearsal remain pending.
+The current generator has two layout families. The web Inspector and Run Reports shipped with a passing six-scenario browser rehearsal. Live-model findings, human judgments, and the timed final presentation remain pending. [Judge console changes](https://github.com/Pradhyut21/Proof-pay/pull/25) · [Current evidence status](evaluation_results.md)
 
 ## Historical rubric matrix
 
