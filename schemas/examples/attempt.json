@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0.0",
+  "task_id": "pp-cda853c47f4a",
+  "run_id": "run-offline-example",
+  "model_id": "demo-fixture",
+  "provider": "offline",
+  "condition": "C1",
+  "timestamp": "2026-11-24T07:00:00Z",
+  "latency_ms": 0,
+  "status": "unscored",
+  "parsed_answer": {
+    "kind": "category",
+    "value": "NORMAL"
+  },
+  "cached": false
+}

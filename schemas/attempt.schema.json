@@ -1,0 +1,313 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "CategoryAnswer": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "category",
+          "title": "Kind",
+          "type": "string"
+        },
+        "value": {
+          "maxLength": 160,
+          "minLength": 1,
+          "title": "Value",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "title": "CategoryAnswer",
+      "type": "object"
+    },
+    "NumericAnswer": {
+      "additionalProperties": false,
+      "properties": {
+        "value_milli": {
+          "maximum": 9007199254740991,
+          "minimum": -9007199254740991,
+          "title": "Value Milli",
+          "type": "integer"
+        },
+        "unit": {
+          "enum": [
+            "kPa",
+            "bar",
+            "psi"
+          ],
+          "title": "Unit",
+          "type": "string"
+        },
+        "kind": {
+          "const": "numeric",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "value_milli",
+        "unit",
+        "kind"
+      ],
+      "title": "NumericAnswer",
+      "type": "object"
+    },
+    "SetAnswer": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "set",
+          "title": "Kind",
+          "type": "string"
+        },
+        "values": {
+          "items": {
+            "maxLength": 160,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 32,
+          "title": "Values",
+          "type": "array",
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "kind",
+        "values"
+      ],
+      "title": "SetAnswer",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "task_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$",
+      "title": "Task Id",
+      "type": "string"
+    },
+    "run_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$",
+      "title": "Run Id",
+      "type": "string"
+    },
+    "model_id": {
+      "maxLength": 160,
+      "minLength": 1,
+      "title": "Model Id",
+      "type": "string"
+    },
+    "provider": {
+      "maxLength": 160,
+      "minLength": 1,
+      "title": "Provider",
+      "type": "string"
+    },
+    "condition": {
+      "enum": [
+        "C0",
+        "C1",
+        "C2",
+        "C3",
+        "C4"
+      ],
+      "title": "Condition",
+      "type": "string"
+    },
+    "timestamp": {
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]{1,6})?(Z|[+-]([01][0-9]|2[0-3]):[0-5][0-9])$",
+      "title": "Timestamp",
+      "type": "string"
+    },
+    "latency_ms": {
+      "maximum": 9007199254740991,
+      "minimum": 0,
+      "title": "Latency Ms",
+      "type": "integer"
+    },
+    "status": {
+      "enum": [
+        "correct",
+        "incorrect",
+        "unscored",
+        "invalid_response",
+        "provider_error",
+        "skipped"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "model_revision": {
+      "anyOf": [
+        {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Model Revision"
+    },
+    "raw_output": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Raw Output"
+    },
+    "parsed_answer": {
+      "anyOf": [
+        {
+          "discriminator": {
+            "mapping": {
+              "category": "#/$defs/CategoryAnswer",
+              "numeric": "#/$defs/NumericAnswer",
+              "set": "#/$defs/SetAnswer"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/CategoryAnswer"
+            },
+            {
+              "$ref": "#/$defs/NumericAnswer"
+            },
+            {
+              "$ref": "#/$defs/SetAnswer"
+            }
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Parsed Answer"
+    },
+    "error": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Error"
+    },
+    "input_tokens": {
+      "anyOf": [
+        {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Input Tokens"
+    },
+    "output_tokens": {
+      "anyOf": [
+        {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Output Tokens"
+    },
+    "cost_usd": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cost Usd"
+    },
+    "cached": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cached"
+    }
+  },
+  "required": [
+    "schema_version",
+    "task_id",
+    "run_id",
+    "model_id",
+    "provider",
+    "condition",
+    "timestamp",
+    "latency_ms",
+    "status"
+  ],
+  "title": "Attempt",
+  "type": "object",
+  "if": {
+    "properties": {
+      "status": {
+        "enum": [
+          "correct",
+          "incorrect",
+          "unscored"
+        ]
+      }
+    }
+  },
+  "then": {
+    "required": [
+      "parsed_answer"
+    ],
+    "properties": {
+      "parsed_answer": {
+        "type": "object"
+      }
+    }
+  },
+  "else": {
+    "properties": {
+      "parsed_answer": {
+        "type": "null"
+      }
+    }
+  }
+}
