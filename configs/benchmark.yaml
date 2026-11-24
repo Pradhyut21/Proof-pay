@@ -1,0 +1,18 @@
+schema_version: "1.0.0"
+dataset_version: "0.1.0"
+generator_config: configs/generator.yaml
+base_seed: "pp-freeze-v1"       # private: namespace for frozen-set scenes; never published with answers
+pilot_seed: "pp-pilot-v1"       # pilot scenes are generated under a different namespace and excluded from the freeze
+base_groups: 110                # target accepted base groups
+max_attempts: 160
+dev_fraction: 0.20              # of all groups, by group; held-out style groups go to the frozen side
+heldout_theme: teal             # style family reserved for the frozen held-out slice
+near_duplicate_hamming: 2       # dHash distance merging scenes into one split unit
+variants:
+  nuisance_every: 3             # every 3rd group also gets a nuisance sibling
+  preserving_every: 4           # every 4th group also gets a unit-conversion sibling
+  diagnostic_target: 40         # separate missing-evidence set
+targets: {R: 100, C: 80, M: 150, X: 100, pairs: 50, diagnostics: 40, total: 500}
+samples: 30
+audit_worksheet_size: 50
+workers: 4

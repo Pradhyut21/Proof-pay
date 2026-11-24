@@ -17,3 +17,12 @@
 *.sqlite-journal
 *.sqlite-shm
 *.sqlite-wal
+# local build and run artifacts (regenerate with scripts/build_dataset.*)
+/data/build/
+/data/private/
+/data/runs/
+/data/runs_e2e/
+*.db
+**/playwright-report/
+**/test-results/
+*.tsbuildinfo

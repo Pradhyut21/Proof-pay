@@ -1,0 +1,96 @@
+{
+  "environment": {
+    "python": "3.12.10",
+    "platform": "Windows-11-10.0.26300-SP0",
+    "machine": "AMD64",
+    "api_bin": "/home/saiki/pp-rust/target/debug/panelproof-api",
+    "api_wsl_distro": "Ubuntu-22.04"
+  },
+  "counts": {
+    "pass": 16,
+    "fail": 0,
+    "not run": 0
+  },
+  "steps": [
+    {
+      "step": "generate 4 base scenes; repeated build has the same manifest hash",
+      "status": "pass",
+      "detail": "4f4974565bc4db4b2160387336911358996b315cd8f0452de617240b744ac9c1"
+    },
+    {
+      "step": "raster verifier accepts scenes with zero wrong readings",
+      "status": "pass",
+      "detail": "{\"verifier_version\": \"1.0.0\", \"scenes\": 4, \"verified\": 4, \"agree_with_truth\": 4, \"exact_tick_agreement\": 4, \"rejection_reasons\": {}}"
+    },
+    {
+      "step": "export contract bundle (public/tasks.jsonl, private/tasks.jsonl, images/)",
+      "status": "pass",
+      "detail": "{\"tasks\": 6, \"pairs\": 4, \"skipped_candidates\": 0, \"out\": \"C:\\\\Users\\\\saiki\\\\AppData\\\\Local\\\\Temp\\\\pp-smoke-0oe5jiw8\\\\bundle\"}"
+    },
+    {
+      "step": "every record validates against the typed contract",
+      "status": "pass",
+      "detail": "6"
+    },
+    {
+      "step": "API imports the bundle and starts",
+      "status": "pass",
+      "detail": "{\"schema_version\":\"1.0.0\",\"status\":\"ok\"}"
+    },
+    {
+      "step": "public task projection has only public fields",
+      "status": "pass",
+      "detail": "6 tasks"
+    },
+    {
+      "step": "served PNG matches the private SHA-256",
+      "status": "pass",
+      "detail": "t_15b127798438a7f7"
+    },
+    {
+      "step": "reveal returns the reference answer with a valid token",
+      "status": "pass",
+      "detail": "HTTP 200"
+    },
+    {
+      "step": "reveal rejects a missing/wrong token",
+      "status": "pass",
+      "detail": ""
+    },
+    {
+      "step": "human attempt with the reference answer is correct (201)",
+      "status": "pass",
+      "detail": "HTTP 201"
+    },
+    {
+      "step": "same idempotency key and answer replays (200)",
+      "status": "pass",
+      "detail": "HTTP 200"
+    },
+    {
+      "step": "same key with a different answer conflicts (409)",
+      "status": "pass",
+      "detail": ""
+    },
+    {
+      "step": "malformed answer is rejected (422)",
+      "status": "pass",
+      "detail": ""
+    },
+    {
+      "step": "web pages and same-origin proxy respond",
+      "status": "pass",
+      "detail": "{\"/\": 200, \"/factory\": 200, \"/arena\": 200, \"/api/pp/demo/healthz\": 200, \"/api/extras/demo/pairs\": 200}"
+    },
+    {
+      "step": "build a small dataset (8 base groups)",
+      "status": "pass",
+      "detail": ": 2\n  },\n  \"shortfalls\": {\n    \"C\": 78,\n    \"M\": 116,\n    \"R\": 89,\n    \"X\": 79,\n    \"pairs\": 39,\n    \"diagnostics\": 37,\n    \"total\": 432\n  },\n  \"attempts\": 38\n}"
+    },
+    {
+      "step": "report generated and labelled DEMO ONLY",
+      "status": "pass",
+      "detail": ""
+    }
+  ]
+}

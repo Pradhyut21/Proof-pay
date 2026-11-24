@@ -1,0 +1,109 @@
+{
+  "axes": {
+    "brightness_+15%": {
+      "agreement_rate": 0.867,
+      "false_accept_rate": 0.0,
+      "n": 30,
+      "rejected": 4,
+      "top_rejection_reasons": {
+        "lamp_caption_unreadable": 6,
+        "missing_lamp_RUN": 6
+      },
+      "verified_correct": 26,
+      "verified_wrong": 0
+    },
+    "brightness_-15%": {
+      "agreement_rate": 1.0,
+      "false_accept_rate": 0.0,
+      "n": 30,
+      "rejected": 0,
+      "top_rejection_reasons": {},
+      "verified_correct": 30,
+      "verified_wrong": 0
+    },
+    "gaussian_blur_0.6": {
+      "agreement_rate": 1.0,
+      "false_accept_rate": 0.0,
+      "n": 30,
+      "rejected": 0,
+      "top_rejection_reasons": {},
+      "verified_correct": 30,
+      "verified_wrong": 0
+    },
+    "gaussian_noise_sigma3": {
+      "agreement_rate": 0.0,
+      "false_accept_rate": 0.0,
+      "n": 30,
+      "rejected": 30,
+      "top_rejection_reasons": {
+        "missing_gauge_INLET": 47,
+        "missing_gauge_OUTLET": 47,
+        "unexpected_instrument_count:0g/0l": 47
+      },
+      "verified_correct": 0,
+      "verified_wrong": 0
+    },
+    "glare_over_panel": {
+      "agreement_rate": 0.467,
+      "false_accept_rate": 0.0,
+      "n": 30,
+      "rejected": 16,
+      "top_rejection_reasons": {
+        "missing_gauge_INLET": 2,
+        "unexpected_instrument_count:1g/2l": 4,
+        "unexpected_instrument_count:4g/4l": 12
+      },
+      "verified_correct": 14,
+      "verified_wrong": 0
+    },
+    "jpeg_q90": {
+      "agreement_rate": 0.633,
+      "false_accept_rate": 0.0,
+      "n": 30,
+      "rejected": 11,
+      "top_rejection_reasons": {
+        "lamp_caption_unreadable": 1,
+        "missing_lamp_RUN": 1,
+        "pump_label_unreadable": 9
+      },
+      "verified_correct": 19,
+      "verified_wrong": 0
+    },
+    "none": {
+      "agreement_rate": 1.0,
+      "false_accept_rate": 0.0,
+      "n": 30,
+      "rejected": 0,
+      "top_rejection_reasons": {},
+      "verified_correct": 30,
+      "verified_wrong": 0
+    },
+    "rotate_1deg": {
+      "agreement_rate": 0.0,
+      "false_accept_rate": 0.0,
+      "n": 30,
+      "rejected": 30,
+      "top_rejection_reasons": {
+        "INLET:scale_not_found": 47,
+        "OUTLET:scale_not_found": 47,
+        "pump_label_unreadable": 43
+      },
+      "verified_correct": 0,
+      "verified_wrong": 0
+    },
+    "scale_0.97": {
+      "agreement_rate": 0.333,
+      "false_accept_rate": 0.0,
+      "n": 30,
+      "rejected": 20,
+      "top_rejection_reasons": {
+        "lamp_caption_unreadable": 29,
+        "missing_lamp_ALARM": 8,
+        "missing_lamp_RUN": 21
+      },
+      "verified_correct": 10,
+      "verified_wrong": 0
+    }
+  },
+  "scenes": 30
+}
