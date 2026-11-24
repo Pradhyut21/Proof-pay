@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 from collections import defaultdict
@@ -19,7 +20,9 @@ from typing import Any
 
 from pydantic import ValidationError
 
+from .adapters import PROMPT_VERSION
 from .metrics import score_attempt
+from .question_bridge import answer_value
 from .schemas import Attempt, Run
 
 _STATUS = {
@@ -31,7 +34,9 @@ _STATUS = {
 }
 
 
-def _require_run_provenance(run_data: dict[str, Any], rows: list[dict[str, Any]]) -> None:
+def _require_run_provenance(
+    run_data: dict[str, Any], rows: list[dict[str, Any]]
+) -> tuple[str, str | None]:
     try:
         run = Run.model_validate(run_data)
         records = [Attempt.model_validate(row) for row in rows]
@@ -52,6 +57,16 @@ def _require_run_provenance(run_data: dict[str, Any], rows: list[dict[str, Any]]
             raise PermissionError("attempt identity, revision or condition conflicts with its run record")
         if record.status == "skipped":
             raise PermissionError("measured report requires a complete frozen cohort, including all planned attempts")
+    sampling = run.sampling_parameters or {}
+    input_digest = sampling.get("public_inputs_sha256")
+    if run.prompt_version != PROMPT_VERSION or not isinstance(input_digest, str) or not re.fullmatch(r"[a-f0-9]{64}", input_digest):
+        raise PermissionError("measured run requires the current prompt version and a valid public input SHA-256")
+    observation_digest = sampling.get("c3_observations_sha256") if run.condition == "C3" else None
+    if run.condition == "C3" and (
+        not isinstance(observation_digest, str) or not re.fullmatch(r"[a-f0-9]{64}", observation_digest)
+    ):
+        raise PermissionError("measured C3 run requires a valid observation SHA-256")
+    return input_digest, observation_digest
 
 
 def load_contract_attempts(path: Path, *, measured: bool = False) -> list[dict[str, Any]]:
@@ -61,8 +76,7 @@ def load_contract_attempts(path: Path, *, measured: bool = False) -> list[dict[s
     if run_file.is_file():
         run = json.loads(run_file.read_text(encoding="utf-8"))
     rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
-    if measured:
-        _require_run_provenance(run, rows)
+    input_digest, observation_digest = _require_run_provenance(run, rows) if measured else (None, None)
     demo = bool(run.get("demo_only"))
     out: list[dict[str, Any]] = []
     for row in rows:
@@ -80,6 +94,8 @@ def load_contract_attempts(path: Path, *, measured: bool = False) -> list[dict[s
                 "model_revision": row.get("model_revision"),
                 "run_id": row.get("run_id"),
                 "condition": row["condition"],
+                "public_inputs_sha256": input_digest,
+                "c3_observations_sha256": observation_digest,
                 "status": status,
                 "response": row.get("parsed_answer"),
                 "latency_ms": row.get("latency_ms"),
@@ -90,10 +106,6 @@ def load_contract_attempts(path: Path, *, measured: bool = False) -> list[dict[s
             }
         )
     return out
-
-
-def _numeric_or_category(answer: dict[str, Any]) -> dict[str, Any]:
-    return {k: v for k, v in answer.items() if k != "tolerance_milli"}
 
 
 def rust_parity(
@@ -121,7 +133,7 @@ def rust_parity(
             refs.append(
                 {
                     "task_id": a["task_id"],
-                    "answer": _numeric_or_category(t["answer"]),
+                    "answer": answer_value(t["answer"]),
                     "tolerance_milli": t["answer"].get("tolerance_milli"),
                     "group_id": t["group_id"],
                     "pair_id": t.get("pair_id"),
@@ -129,7 +141,7 @@ def rust_parity(
                 }
             )
             usable = outcome in ("correct", "incorrect")
-            preds.append({"task_id": a["task_id"], "answer": _numeric_or_category(a["response"]) if usable else None})
+            preds.append({"task_id": a["task_id"], "answer": answer_value(a["response"]) if usable else None})
             expect[a["task_id"]] = outcome if usable else "missing"
         with _tmp(refs) as refs_path, _tmp(preds) as preds_path:
             proc = subprocess.run(

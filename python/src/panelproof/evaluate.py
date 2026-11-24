@@ -57,6 +57,15 @@ def _digest(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def public_input_sha256(payload: PublicInput, image_sha256: str | None) -> str:
+    """Commit to the exact prompt and, when sent, the PNG bytes."""
+    return _digest(_canonical({"prompt": payload.prompt(), "image_sha256": image_sha256}))
+
+
+def input_selection_sha256(inputs_by_task: dict[str, str]) -> str:
+    return _digest(_canonical(inputs_by_task))
+
+
 def _reject_constant(value: str) -> None:
     raise ValueError(f"unexpected JSON constant: {value}")
 
@@ -308,6 +317,7 @@ def _attempt(
     asset_root: Path,
     db: sqlite3.Connection,
     visible_readings: tuple[VisiblePump, ...] | None,
+    inputs_by_task: dict[str, str],
 ) -> Attempt:
     start = time.monotonic()
     base = {
@@ -344,6 +354,9 @@ def _attempt(
         return record("skipped", error=str(exc))
     payload = PublicInput(
         task.question, task.public_rules, task.response_schema, image, visible_readings
+    )
+    inputs_by_task[task.task_id] = public_input_sha256(
+        payload, _digest(image) if image is not None else None
     )
     key = (
         _cache_key(adapter, payload, run.condition, limits.max_tokens) if adapter.revision else None
@@ -426,6 +439,7 @@ def evaluate(
     )
     cache_path.parent.mkdir(parents=True, exist_ok=True)
     budget = _Budget(limits)
+    inputs_by_task: dict[str, str] = {}
     with closing(sqlite3.connect(cache_path, timeout=30)) as db:
         with db:
             db.execute(
@@ -440,9 +454,12 @@ def evaluate(
                 asset_root,
                 db,
                 observations.readings_by_task[task.task_id] if observations is not None else None,
+                inputs_by_task,
             )
             for task in tasks
         ]
+    sampling["public_inputs_sha256"] = input_selection_sha256(inputs_by_task)
+    run = run.model_copy(update={"sampling_parameters": sampling})
     return run, attempts, budget.calls
 
 

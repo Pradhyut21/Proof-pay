@@ -239,8 +239,9 @@ def test_c3_provider_gets_visible_readings_only_and_cache_tracks_readings(tmp_pa
             "lamps": {"RUN": "on", "ALARM": "off"},
         }
     ]
-    _, cached, calls = run_eval(tmp_path, [task], adapter, condition="C3", limits=limits)
+    repeat, cached, calls = run_eval(tmp_path, [task], adapter, condition="C3", limits=limits)
     assert not calls and cached[0].cached and len(sent) == 1
+    assert first.sampling_parameters["public_inputs_sha256"] == repeat.sampling_parameters["public_inputs_sha256"]
     image_path.write_bytes(png(red=12))
     changed, _, calls = run_eval(tmp_path, [task], adapter, condition="C3", limits=limits)
     assert calls == 1 and len(sent) == 2
@@ -248,6 +249,7 @@ def test_c3_provider_gets_visible_readings_only_and_cache_tracks_readings(tmp_pa
         first.sampling_parameters["c3_observations_sha256"]
         != changed.sampling_parameters["c3_observations_sha256"]
     )
+    assert first.sampling_parameters["public_inputs_sha256"] != changed.sampling_parameters["public_inputs_sha256"]
 
 
 def test_c3_unverified_task_blocks_entire_cohort_and_dry_run_uses_preflight(
