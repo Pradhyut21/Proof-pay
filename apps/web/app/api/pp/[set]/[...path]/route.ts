@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { serverConfig } from "@/lib/server/config";
+import { currentFactoryDir } from "@/lib/server/jobs";
 import { IDEMPOTENCY_RE, resolveUpstream } from "@/lib/server/proxy";
 
 export const dynamic = "force-dynamic";
@@ -12,6 +13,10 @@ async function handle(req: NextRequest, ctx: { params: Promise<{ set: string; pa
   const base =
     set === "demo" ? serverConfig.demoApi : set === "factory" ? serverConfig.factoryApi : null;
   if (!base) return Response.json({ error: "unknown_dataset" }, { status: 404 });
+  const job = req.nextUrl.searchParams.get("job") ?? "";
+  const expired = () =>
+    Response.json({ error: "This factory result is no longer active." }, { status: 410 });
+  if (set === "factory" && !currentFactoryDir(job)) return expired();
   const up = resolveUpstream(req.method, path, req.nextUrl.searchParams);
   if (!up) return Response.json({ error: "not_found" }, { status: 404 });
 
@@ -32,6 +37,7 @@ async function handle(req: NextRequest, ctx: { params: Promise<{ set: string; pa
     headers.authorization = `Bearer ${serverConfig.revealToken}`;
   }
   try {
+    if (set === "factory" && !currentFactoryDir(job)) return expired();
     const res = await fetch(`${base}${up.path}`, {
       method: req.method,
       headers,
@@ -39,6 +45,10 @@ async function handle(req: NextRequest, ctx: { params: Promise<{ set: string; pa
       cache: "no-store",
       signal: AbortSignal.timeout(10_000),
     });
+    if (set === "factory" && !currentFactoryDir(job)) {
+      await res.body?.cancel();
+      return expired();
+    }
     const out = new Headers();
     for (const h of ["content-type", "cache-control", "x-content-type-options"]) {
       const v = res.headers.get(h);

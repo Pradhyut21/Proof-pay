@@ -66,7 +66,7 @@ export interface ModelAttempt {
   label?: string;
 }
 
-export type JobStatus = "queued" | "running" | "succeeded" | "failed";
+export type JobStatus = "queued" | "running" | "succeeded" | "failed" | "expired";
 export type Difficulty = "easy" | "medium" | "hard";
 
 export interface Job {

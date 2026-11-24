@@ -24,15 +24,20 @@ function readJsonl(file: string): Record<string, unknown>[] {
 
 /** Demo fixture files that sit beside the contract bundle: counterfactual pairs and DEMO ONLY model attempts. */
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   ctx: { params: Promise<{ set: string; rest: string[] }> },
 ) {
   const { set, rest } = await ctx.params;
   const dir =
-    set === "demo" ? serverConfig.demoDir : set === "factory" ? currentFactoryDir() : undefined;
+    set === "demo"
+      ? serverConfig.demoDir
+      : set === "factory"
+        ? currentFactoryDir(req.nextUrl.searchParams.get("job") ?? "")
+        : undefined;
   if (set !== "demo" && set !== "factory")
     return Response.json({ error: "unknown_dataset" }, { status: 404 });
-  if (!dir) return Response.json([]);
+  if (!dir)
+    return Response.json({ error: "This factory result is no longer active." }, { status: 410 });
   if (rest.length === 1 && rest[0] === "pairs") {
     return Response.json(readJsonl(path.join(dir, "public", "pairs.jsonl")));
   }

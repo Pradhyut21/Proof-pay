@@ -1,6 +1,6 @@
 # Dataset card: PanelProof 0.1.0
 
-Numbers are from `docs/results/dataset_report.json` for the committed configuration. Rebuild with `./run.sh dataset`; the manifest hash `a6d884a665c069da96facc90189922660a474f8cba9085a8af1a004b88fe2d00` must match.
+The tables on this page describe the historical v0.1.0 public reproducibility run in `docs/results/dataset_report.json`. Its manifest is `a6d884a665c069da96facc90189922660a474f8cba9085a8af1a004b88fe2d00`. The current v0.2 exporter validates same-question counterfactual pairs and distinguishes a public reproducibility build from a privately seeded holdout. [Current holdout workflow](../README.md)
 
 ## Contents
 

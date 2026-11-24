@@ -60,10 +60,15 @@ async function request<T>(path: string, init: RequestInit = {}, timeoutMs = 8000
   }
 }
 
-const pp = (set: DatasetSet, p: string) => `/api/pp/${set}/${p}`;
+function scoped(path: string, job?: string): string {
+  if (!job) return path;
+  return `${path}${path.includes("?") ? "&" : "?"}job=${encodeURIComponent(job)}`;
+}
 
-export const imageUrl = (set: DatasetSet, taskId: string): string =>
-  pp(set, `api/v1/tasks/${encodeURIComponent(taskId)}/image`);
+const pp = (set: DatasetSet, p: string, job?: string) => scoped(`/api/pp/${set}/${p}`, job);
+
+export const imageUrl = (set: DatasetSet, taskId: string, job?: string): string =>
+  pp(set, `api/v1/tasks/${encodeURIComponent(taskId)}/image`, job);
 
 function newKey(): string {
   const rand =
@@ -74,26 +79,34 @@ function newKey(): string {
 const jsonHeaders = { "content-type": "application/json" };
 
 export const api = {
-  health: (set: DatasetSet = "demo") => request<{ status: string }>(pp(set, "healthz")),
-  listTasks: (set: DatasetSet, cursor?: string) =>
+  health: (set: DatasetSet = "demo", job?: string) =>
+    request<{ status: string }>(pp(set, "healthz", job)),
+  listTasks: (set: DatasetSet, cursor?: string, job?: string) =>
     request<TaskPage>(
-      pp(set, `api/v1/tasks?limit=100${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`),
+      pp(
+        set,
+        `api/v1/tasks?limit=100${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`,
+        job,
+      ),
     ),
-  getTask: (set: DatasetSet, id: string) =>
-    request<PublicTask>(pp(set, `api/v1/tasks/${encodeURIComponent(id)}`)),
-  postAttempt: (set: DatasetSet, taskId: string, answer: Answer) =>
-    request<AttemptResult>(pp(set, "api/v1/attempts"), {
+  getTask: (set: DatasetSet, id: string, job?: string) =>
+    request<PublicTask>(pp(set, `api/v1/tasks/${encodeURIComponent(id)}`, job)),
+  postAttempt: (set: DatasetSet, taskId: string, answer: Answer, job?: string) =>
+    request<AttemptResult>(pp(set, "api/v1/attempts", job), {
       method: "POST",
       headers: { ...jsonHeaders, "idempotency-key": newKey() },
       body: JSON.stringify({ task_id: taskId, answer }),
     }),
-  reveal: (set: DatasetSet, id: string) =>
-    request<Reveal>(pp(set, `api/v1/tasks/${encodeURIComponent(id)}/reveal`), {
+  reveal: (set: DatasetSet, id: string, job?: string) =>
+    request<Reveal>(pp(set, `api/v1/tasks/${encodeURIComponent(id)}/reveal`, job), {
       method: "POST",
     }),
-  listPairs: (set: DatasetSet) => request<Pair[]>(`/api/extras/${set}/pairs`),
-  modelAttempts: (set: DatasetSet, taskId: string) =>
-    request<ModelAttempt[]>(`/api/extras/${set}/attempts/${encodeURIComponent(taskId)}`),
+  listPairs: (set: DatasetSet, job?: string) =>
+    request<Pair[]>(scoped(`/api/extras/${set}/pairs`, job)),
+  modelAttempts: (set: DatasetSet, taskId: string, job?: string) =>
+    request<ModelAttempt[]>(
+      scoped(`/api/extras/${set}/attempts/${encodeURIComponent(taskId)}`, job),
+    ),
   startJob: (seed: string, count: number, difficulty: Difficulty) =>
     request<Job>(
       "/api/jobs",

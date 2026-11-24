@@ -1,3 +1,4 @@
+import hashlib
 import json
 
 import pytest
@@ -5,12 +6,14 @@ import pytest
 from panelproof.metrics import (
     bootstrap_ci,
     build_report,
+    main_metrics,
     require_freeze,
     score_attempt,
     selection_hash,
     summarize,
 )
 from panelproof.question_bridge import numeric
+from panelproof.scene import canonical_json
 
 
 def task(tid, kind="state", answer=None, group="g1", pair=None, vk="base", skill="M", diff="easy"):
@@ -129,12 +132,103 @@ def test_summarize_empty_has_no_fake_rates():
     assert s["valid_only_accuracy"] is None and s["all_attempt_accuracy"] is None
 
 
+def holdout_manifest(**fields):
+    body = {"dataset_purpose": "measured_holdout", "seed_commitment_sha256": "a" * 64, **fields}
+    return {**body, "manifest_sha256": hashlib.sha256(canonical_json(body)).hexdigest()}
+
+
 def test_measured_run_requires_freeze_and_approval():
     h = selection_hash(["a", "b"], ["C0", "C1"])
+    manifest = holdout_manifest()
+    approval = {"selection_hash": h, "approved_by": "owner", "manifest_sha256": manifest["manifest_sha256"]}
     with pytest.raises(PermissionError):
         require_freeze(None, None, h)
     with pytest.raises(PermissionError):
-        require_freeze({"manifest_sha256": "x"}, None, h)
+        require_freeze({"manifest_sha256": "a" * 64}, approval, h)
     with pytest.raises(PermissionError):
-        require_freeze({"manifest_sha256": "x"}, {"selection_hash": "other", "approved_by": "me"}, h)
-    require_freeze({"manifest_sha256": "x"}, {"selection_hash": h, "approved_by": "owner"}, h)
+        require_freeze(holdout_manifest(dataset_purpose="repro"), approval, h)
+    with pytest.raises(PermissionError):
+        require_freeze(manifest, {**approval, "selection_hash": "other"}, h)
+    with pytest.raises(PermissionError):
+        require_freeze({**manifest, "dataset_version": "tampered"}, approval, h)
+    require_freeze(manifest, approval, h)
+
+
+def write_run(root, condition, ids, *, mock=False):
+    root.mkdir()
+    identity = {"provider": "openai_compatible", "model_id": "fixture-model", "model_revision": "fixture-v1"}
+    base = {"schema_version": "1.0.0", "run_id": f"fixture-{condition}", "condition": condition, **identity}
+    run = {
+        **base,
+        "prompt_version": "fixture-v1",
+        "seed": 0,
+        "max_calls": len(ids),
+        "selected_task_ids_sha256": hashlib.sha256(canonical_json(ids)).hexdigest(),
+        "environment_fingerprint": "synthetic contract fixture",
+        "demo_only": mock,
+    }
+    rows = [
+        {
+            **base,
+            "task_id": tid,
+            "status": "unscored",
+            "parsed_answer": cat("NORMAL"),
+            "timestamp": "2026-11-24T00:00:00Z",
+            "latency_ms": 1,
+        }
+        for tid in ids
+    ]
+    (root / "run.json").write_text(json.dumps(run), encoding="utf-8")
+    path = root / "attempts.jsonl"
+    path.write_text("".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8")
+    return path, identity
+
+
+def test_measured_report_checks_holdout_approval_and_source_runs(tmp_path):
+    dataset = tmp_path / "dataset"
+    (dataset / "private").mkdir(parents=True)
+    answers = dataset / "private" / "answers.jsonl"
+    rows = [{**task(tid), "split": "frozen_main"} for tid in ("a", "b")]
+    answers.write_text("".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8")
+    manifest = holdout_manifest(private_commitments={"private/answers.jsonl": hashlib.sha256(answers.read_bytes()).hexdigest()})
+    (dataset / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    c0, identity = write_run(tmp_path / "first", "C0", ["b", "a"])
+    c1, _ = write_run(tmp_path / "second", "C1", ["a", "b"])
+    empty, _ = write_run(tmp_path / "empty", "C1", [])
+    mock, _ = write_run(tmp_path / "mock", "C1", ["a", "b"], mock=True)
+    disjoint, _ = write_run(tmp_path / "disjoint", "C1", ["b"])
+    approval = tmp_path / "approval.json"
+    approval.write_text(json.dumps({
+        "approved_by": "fixture approver",
+        "selection_hash": selection_hash(["a", "b"], ["C0", "C1"]),
+        "manifest_sha256": manifest["manifest_sha256"],
+        "models": [identity],
+    }), encoding="utf-8")
+    out = tmp_path / "report"
+    args = ["--tasks", str(dataset), "--out", str(out), "--attempt-format", "contract", "--measured", "--approval", str(approval)]
+
+    for rejected, reason in (
+        (empty, "nonempty task selection"),
+        (mock, "DEMO ONLY"),
+        (disjoint, "same nonempty task selection"),
+    ):
+        with pytest.raises(PermissionError, match=reason):
+            main_metrics([*args, "--attempts", str(c0), "--attempts", str(rejected)])
+        assert not out.exists()
+
+    assert main_metrics([*args, "--attempts", str(c0), "--attempts", str(c1)]) == 0
+    report = json.loads((out / "report.json").read_text())
+    assert report["banner"] == "MEASURED"
+    assert report["provenance"]["models"] == [{**identity, "run_ids": ["fixture-C0", "fixture-C1"]}]
+
+    (c1.parent / "run.json").unlink()
+    with pytest.raises(PermissionError, match="adjacent run records"):
+        main_metrics([*args, "--attempts", str(c0), "--attempts", str(c1)])
+    answers.write_text("{}", encoding="utf-8")
+    with pytest.raises(PermissionError, match="answers do not match"):
+        main_metrics([*args, "--attempts", str(c0), "--attempts", str(c1)])
+
+
+def test_no_unapproved_report_is_labelled_measured():
+    row = {**att("a", "C1", cat("NORMAL")), "mock": False}
+    assert build_report({"a": task("a")}, [row])["banner"].startswith("DEVELOPMENT")

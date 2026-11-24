@@ -11,10 +11,14 @@ import csv
 import hashlib
 import json
 import random
+import re
 import shutil
+import stat
 from collections import Counter, defaultdict
 from concurrent.futures import ProcessPoolExecutor
-from pathlib import Path
+from contextlib import nullcontext
+from pathlib import Path, PurePosixPath
+from tempfile import TemporaryDirectory, mkdtemp
 from typing import Any
 
 import cv2
@@ -45,6 +49,8 @@ VARIANT_TO_CONTRACT = {
     "nuisance": "nonsemantic",
     "missing": "evidence_removed",
 }
+OWNER_FILE = ".panelproof-dataset.json"
+OWNER_FORMAT = "panelproof.dataset.1"
 
 
 def contract_evidence(evidence: list[dict[str, Any]], pump_id: str) -> list[dict[str, Any]]:
@@ -118,14 +124,137 @@ def _run(pool: ProcessPoolExecutor | None, scenes: list[Scene]) -> list[dict[str
 # ------------------------------------------------------------------ build
 
 
-def build_dataset(cfg_path: Path, out: Path, workers: int | None = None) -> dict[str, Any]:
+def _in_checkout(path: Path) -> bool:
+    return path.is_relative_to(repo_root().resolve()) or any(
+        (parent / ".git").exists() for parent in (path, *path.parents)
+    )
+
+
+def _holdout_seed(path: Path) -> str:
+    source = path.expanduser().absolute()
+    resolved = source.resolve(strict=True)
+    if _in_checkout(source) or _in_checkout(resolved) or not resolved.is_file():
+        raise ValueError("holdout seed must be a regular file outside all Git checkouts")
+    with resolved.open("rb") as seed_file:
+        raw = seed_file.read(128)
+    value = raw.strip()
+    if len(raw) == 128 or not re.fullmatch(rb"[0-9a-fA-F]{64}", value):
+        raise ValueError("holdout seed file must contain exactly 64 random hexadecimal characters")
+    return value.decode("ascii").lower()
+
+
+def _is_link(path: Path) -> bool:
+    attrs = getattr(path.lstat(), "st_file_attributes", 0)
+    return path.is_symlink() or bool(attrs & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0))
+
+
+def _inventory(directory: Path) -> list[str]:
+    paths = []
+    for path in directory.rglob("*"):
+        if _is_link(path) or not (path.is_file() or path.is_dir()):
+            raise ValueError("dataset directory contains a link or unsupported file type")
+        relative = path.relative_to(directory).as_posix()
+        if relative != OWNER_FILE:
+            paths.append(relative)
+    return sorted(paths)
+
+
+def _check_destination(directory: Path) -> None:
+    if not directory.exists() and not directory.is_symlink():
+        return
+    if _is_link(directory) or not directory.is_dir():
+        raise ValueError("dataset output must be a directory without links")
+    if not any(directory.iterdir()):
+        return
+    marker = directory / OWNER_FILE
+    if not marker.is_file() or _is_link(marker):
+        raise ValueError("dataset output is not empty or owned by PanelProof; use a new directory")
+    owner = json.loads(marker.read_text(encoding="utf-8"))
+    if owner != {"format": OWNER_FORMAT, "paths": _inventory(directory)}:
+        raise ValueError("dataset output contains unowned or missing artifacts; use a new directory")
+
+
+def _publish_dataset(staged: Path, destination: Path, previous: Path) -> None:
+    _check_destination(destination)
+    if destination.exists():
+        destination.rename(previous)
+    try:
+        _check_destination(previous)
+        staged.rename(destination)
+    except BaseException:
+        if previous.exists():
+            try:
+                previous.rename(destination)
+            except OSError as error:
+                raise RuntimeError(f"dataset was preserved for recovery at {previous}") from error
+        raise
+
+
+def build_dataset(
+    cfg_path: Path, out: Path, workers: int | None = None, *, holdout_seed_file: Path | None = None
+) -> dict[str, Any]:
     cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
     gcfg = load_config(repo_root() / cfg["generator_config"])
-    workers = workers or cfg["workers"]
-    if out.exists():
-        for child in out.iterdir():  # clear contents, keep the directory (it may be a shell cwd)
-            shutil.rmtree(child) if child.is_dir() else child.unlink()
-    pool = ProcessPoolExecutor(max_workers=workers) if workers > 1 else None
+    workers = workers if workers is not None else cfg["workers"]
+    if workers < 1:
+        raise ValueError("workers must be positive")
+
+    destination = out.expanduser().absolute()
+    _check_destination(destination)
+    destination = destination.resolve()
+    if holdout_seed_file is None:
+        seed = cfg.get("repro_seed", cfg.get("base_seed"))
+        if not isinstance(seed, str) or not seed:
+            raise ValueError("benchmark configuration must provide a public reproducibility seed")
+        metadata = {"dataset_purpose": "repro"}
+    else:
+        if _in_checkout(destination):
+            raise ValueError("measured holdout output must be outside all Git checkouts")
+        seed = _holdout_seed(holdout_seed_file)
+        metadata = {"dataset_purpose": "measured_holdout", "seed_commitment_sha256": sha(seed.encode("ascii"))}
+
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    scratch = Path(mkdtemp(prefix=".panelproof-stage-", dir=destination.parent))
+    staged = scratch / "bundle"
+    previous = scratch / "previous"
+    installed = False
+    try:
+        staged.mkdir()
+        report = _build_dataset(cfg, gcfg, staged, workers, seed, metadata)
+        audit = audit_dataset(staged)
+        if not audit["pass"]:
+            raise ValueError("staged dataset failed its artifact and split audit")
+        owner = {"format": OWNER_FORMAT, "paths": _inventory(staged)}
+        (staged / OWNER_FILE).write_text(json.dumps(owner) + "\n", encoding="utf-8")
+        _publish_dataset(staged, destination, previous)
+        installed = True
+        return report
+    finally:
+        if installed or not previous.exists():
+            shutil.rmtree(scratch, ignore_errors=True)
+
+
+def _build_dataset(
+    cfg: dict[str, Any],
+    gcfg: dict[str, Any],
+    out: Path,
+    workers: int,
+    generation_seed: str,
+    metadata: dict[str, str],
+) -> dict[str, Any]:
+    executor = ProcessPoolExecutor(max_workers=workers) if workers > 1 else nullcontext()
+    with executor as pool:
+        return _generate_dataset(cfg, gcfg, out, pool, generation_seed, metadata)
+
+
+def _generate_dataset(
+    cfg: dict[str, Any],
+    gcfg: dict[str, Any],
+    out: Path,
+    pool: ProcessPoolExecutor | None,
+    generation_seed: str,
+    metadata: dict[str, str],
+) -> dict[str, Any]:
     ledger: list[dict[str, Any]] = []
     attempts = 0
     base_attempts = 0
@@ -135,7 +264,7 @@ def build_dataset(cfg_path: Path, out: Path, workers: int | None = None) -> dict
     i = 0
     while len(accepted) < cfg["base_groups"] and i < cfg["max_attempts"]:
         batch = [
-            generate_scene(f"{cfg['base_seed']}:{j:05d}", gcfg) for j in range(i, min(i + 24, cfg["max_attempts"]))
+            generate_scene(f"{generation_seed}:{j:05d}", gcfg) for j in range(i, min(i + 24, cfg["max_attempts"]))
         ]
         for sc, res in zip(batch, _run(pool, batch), strict=True):
             attempts += 1
@@ -184,8 +313,6 @@ def build_dataset(cfg_path: Path, out: Path, workers: int | None = None) -> dict
             diag_seen += 1
         kept.append((g, v))
     results = _run(pool, [v.scene for _, v in kept])
-    if pool:
-        pool.shutdown()
     variants: list[dict[str, Any]] = []
     for (g, v), res in zip(kept, results, strict=True):
         attempts += 1
@@ -293,6 +420,7 @@ def build_dataset(cfg_path: Path, out: Path, workers: int | None = None) -> dict
                 "answer": q.answer if not diag else {"kind": "category", "value": "INSUFFICIENT"},
                 "group_id": t["group_id"],
                 "pair_id": t.get("pair_id"),
+                "pair_ids": t.get("pair_ids", []),
                 "variant_kind": t["variant_kind"],
                 "variant_edit": t.get("edit"),
                 "layout_family": t["scene"].layout_family(),
@@ -331,7 +459,7 @@ def build_dataset(cfg_path: Path, out: Path, workers: int | None = None) -> dict
         json.dumps(units["report"], indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
 
-    manifest = _manifest(out, cfg, gcfg)
+    manifest = _manifest(out, cfg, gcfg, metadata)
     report = _report(cfg, (attempts, base_attempts), accepted, variants, tasks, ledger, units, manifest)
     (out / "dataset_report.json").write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     _write_samples(out, cfg, priv, pub)
@@ -426,16 +554,23 @@ def _select_tasks(
     accepted: list[dict[str, Any]], variants: list[dict[str, Any]], cfg: dict[str, Any], split_of: dict[str, str]
 ) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
-    seen: set[tuple[str, str, str, str]] = set()
+    seen: dict[tuple[str, str, str, str], dict[str, Any]] = {}
 
     def add(t: dict[str, Any] | None) -> None:
         if not t:
             return
         q = t["q"]
         key = (t["scene"].scene_id, q.kind, q.pump_id, (q.role or "") + (q.target_unit or ""))
-        if key in seen:
+        previous = seen.get(key)
+        pair = t.get("pair_id")
+        if previous is not None:
+            if pair:
+                previous.setdefault("pair_id", pair)
+                previous.setdefault("pair_ids", []).append(pair)
             return
-        seen.add(key)
+        if pair:
+            t["pair_ids"] = [pair]
+        seen[key] = t
         out.append(t)
 
     def pick(scene: Scene, kind: str, pump: str, role: str | None = None) -> Question | None:
@@ -471,7 +606,6 @@ def _select_tasks(
                 }
             )
             continue
-        pid = "p_" + hid(gid, var.kind, var.edit)
         kinds = {
             "semantic": [("state", None), ("consistency", None)],
             "nuisance": [("state", None), ("consistency", None)],
@@ -479,22 +613,22 @@ def _select_tasks(
         }[var.kind]
         pump = var.pump_id or base.pumps[0].pump_id
         for kind, role in kinds:
-            for scene, r, vk in ((base, bres, "base"), (var.scene, res, var.kind)):
-                q = pick(scene, kind, pump, role)
-                if q:
-                    add(
-                        _task(
-                            g,
-                            scene,
-                            r,
-                            q,
-                            split,
-                            pair_id=pid,
-                            variant_kind=vk,
-                            edit=var.edit if vk != "base" else None,
-                            diff=var.diff if vk != "base" else [],
-                        )
-                    )
+            before = pick(base, kind, pump, role)
+            after = pick(var.scene, kind, pump, role)
+            if before is None or after is None:
+                continue
+            changes_answer = not answers_agree(before.answer, after.answer)
+            if changes_answer != (var.kind == "semantic"):
+                continue
+            pid = "p_" + hid(gid, var.kind, var.edit, kind, pump, role or "")
+            original = _task(g, base, bres, before, split, pair_id=pid, variant_kind="base")
+            changed = _task(
+                g, var.scene, res, after, split, pair_id=pid, variant_kind=var.kind,
+                edit=var.edit, diff=var.diff,
+            )
+            if original is not None and changed is not None:
+                add(original)
+                add(changed)
 
     # fill per-skill minimums from base scenes, in deterministic hash order
     def count(skill: str) -> int:
@@ -509,7 +643,7 @@ def _select_tasks(
         for a, p in pool:
             if count(skill) >= cfg["targets"][skill]:
                 break
-            roles = ["INLET", "OUTLET"] if kind in ("read", "convert") else [None]
+            roles = ["OUTLET"] if kind == "convert" else ["INLET", "OUTLET"] if kind == "read" else [None]
             role = roles[int(hid(a["group_id"], p.pump_id, kind, n=4), 16) % len(roles)]
             q = pick(a["scene"], kind, p.pump_id, role)
             if q:
@@ -519,7 +653,9 @@ def _select_tasks(
     return out
 
 
-def _manifest(out: Path, cfg: dict[str, Any], gcfg: dict[str, Any]) -> dict[str, Any]:
+def _manifest(
+    out: Path, cfg: dict[str, Any], gcfg: dict[str, Any], metadata: dict[str, str]
+) -> dict[str, Any]:
     files = {
         str(p.relative_to(out)).replace("\\", "/"): sha(p.read_bytes())
         for p in sorted(out.rglob("*"))
@@ -528,6 +664,7 @@ def _manifest(out: Path, cfg: dict[str, Any], gcfg: dict[str, Any]) -> dict[str,
     public = {k: v for k, v in files.items() if not k.startswith("private/") and not k.startswith("samples/")}
     commitments = {k: v for k, v in files.items() if k.startswith("private/")}
     body = {
+        **metadata,
         "schema_version": SCHEMA_VERSION,
         "dataset_version": cfg["dataset_version"],
         "verifier_version": VERIFIER_VERSION,
@@ -545,7 +682,7 @@ def _report(cfg, att, accepted, variants, tasks, ledger, units, manifest) -> dic
     attempts, base_attempts = att
     main = [t for t in tasks if t["set"] == "main"]
     diag = [t for t in tasks if t["set"] == "diagnostic"]
-    pairs = {t["pair_id"] for t in main if t.get("pair_id")}
+    pairs = {pair for t in main for pair in t.get("pair_ids", [])}
     by_kind = Counter(t["variant_kind"] for t in main if t.get("pair_id") and t["variant_kind"] != "base")
 
     def dist(f):
@@ -559,6 +696,7 @@ def _report(cfg, att, accepted, variants, tasks, ledger, units, manifest) -> dic
     skills = dist(lambda x: x["q"].skill)
     return {
         "dataset_version": cfg["dataset_version"],
+        "dataset_purpose": manifest["dataset_purpose"],
         "manifest_sha256": manifest["manifest_sha256"],
         "attempts": attempts,
         "accepted_base_groups": len(accepted),
@@ -600,6 +738,8 @@ def _report(cfg, att, accepted, variants, tasks, ledger, units, manifest) -> dic
 def _contact_sheet(images: list[Path], labels: list[str], out: Path, cols: int = 5) -> None:
     from PIL import Image, ImageDraw
 
+    if not images:
+        return
     cw, ch = 384, 288
     rows = (len(images) + cols - 1) // cols
     sheet = Image.new("RGB", (cols * cw, rows * (ch + 20)), (255, 255, 255))
@@ -714,7 +854,34 @@ def _write_samples(
 # ------------------------------------------------------------------ audit
 
 
-def audit_dataset(root: Path, rebuild_cfg: Path | None = None, workers: int = 1) -> dict[str, Any]:
+def _manifest_file_drift(root: Path, files: dict[str, str]) -> list[str]:
+    drift = []
+    root = root.resolve()
+    for name, digest in files.items():
+        relative = PurePosixPath(name)
+        path = root.joinpath(*relative.parts)
+        if (
+            relative.is_absolute()
+            or relative.as_posix() != name
+            or ".." in relative.parts
+            or "\\" in name
+            or ":" in name
+            or not path.resolve().is_relative_to(root)
+            or not path.is_file()
+            or _is_link(path)
+            or sha(path.read_bytes()) != digest
+        ):
+            drift.append(name)
+    return sorted(drift)
+
+
+def audit_dataset(
+    root: Path,
+    rebuild_cfg: Path | None = None,
+    workers: int = 1,
+    *,
+    holdout_seed_file: Path | None = None,
+) -> dict[str, Any]:
     priv = [json.loads(line) for line in (root / "private" / "answers.jsonl").read_text(encoding="utf-8").splitlines()]
     findings: dict[str, Any] = {}
     # group / lineage leakage
@@ -740,6 +907,8 @@ def audit_dataset(root: Path, rebuild_cfg: Path | None = None, workers: int = 1)
     # private fields in public records
     leaked, answers_text = 0, [json.dumps(p["answer"], sort_keys=True) for p in priv]
     seeds = {p["seed"] for p in priv}
+    seed_prefixes = {s.split(":", 1)[0] for s in seeds}
+    seeds.update(prefix for prefix in seed_prefixes if re.fullmatch(r"[0-9a-f]{64}", prefix))
     for f in sorted((root / "public").glob("*.jsonl")):
         raw = f.read_text(encoding="utf-8")
         for line in raw.splitlines():
@@ -749,17 +918,57 @@ def audit_dataset(root: Path, rebuild_cfg: Path | None = None, workers: int = 1)
         leaked += sum(1 for s in seeds if s in raw)
     findings["public_records_with_private_fields_or_seeds"] = leaked
     findings["private_answer_records"] = len(answers_text)
+    pairs: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for row in priv:
+        for pair_id in row.get("pair_ids", []):
+            pairs[pair_id].append(row)
+    bad_pairs = 0
+    for members in pairs.values():
+        if len(members) != 2:
+            bad_pairs += 1
+            continue
+        base, variant = sorted(members, key=lambda row: row["variant_kind"] != "base")
+        same_question = all(
+            base.get(key) == variant.get(key)
+            for key in ("group_id", "split", "kind", "pump_id", "role", "target_unit")
+        )
+        valid_kind = variant["variant_kind"] in {"semantic", "nuisance", "preserving"}
+        flips = not answers_agree(base["answer"], variant["answer"])
+        bad_pairs += not (
+            same_question and base["variant_kind"] == "base" and valid_kind
+            and flips == (variant["variant_kind"] == "semantic")
+        )
+    findings["question_pairs_checked"] = len(pairs)
+    findings["invalid_question_pairs"] = bad_pairs
     # hash drift: manifest recomputation + optional repeated pinned build
     man = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
-    drift = [
-        k for k, v in {**man["public_files"], **man["private_commitments"]}.items() if sha((root / k).read_bytes()) != v
-    ]
+    claimed = man.pop("manifest_sha256", None)
+    drift = _manifest_file_drift(root, {**man["public_files"], **man["private_commitments"]})
+    purpose = man.get("dataset_purpose", "repro")
+    commitment = man.get("seed_commitment_sha256")
+    findings["dataset_purpose"] = purpose
+    findings["manifest_sha256_valid"] = claimed == sha(canonical_json(man))
+    findings["dataset_purpose_valid"] = (
+        purpose == "repro" and commitment is None
+        or purpose == "measured_holdout"
+        and isinstance(commitment, str)
+        and bool(re.fullmatch(r"[0-9a-f]{64}", commitment))
+        and not _in_checkout(root.resolve())
+    )
     findings["files_with_hash_drift"] = drift
+    if holdout_seed_file is not None and (rebuild_cfg is None or purpose != "measured_holdout"):
+        raise ValueError("holdout seed file is only used to rebuild a measured holdout")
     if rebuild_cfg:
-        tmp = root.parent / (root.name + "_rebuild")
-        rep = build_dataset(rebuild_cfg, tmp, workers)
-        findings["rebuild_manifest_equal"] = rep["manifest_sha256"] == man["manifest_sha256"]
-        shutil.rmtree(tmp, ignore_errors=True)
+        if purpose == "measured_holdout":
+            if holdout_seed_file is None:
+                raise ValueError("rebuilding a measured holdout requires its local seed file")
+            if sha(_holdout_seed(holdout_seed_file).encode("ascii")) != commitment:
+                raise ValueError("holdout seed file does not match the manifest commitment")
+        with TemporaryDirectory(prefix="panelproof-audit-", dir=root.resolve().parent) as scratch:
+            rep = build_dataset(
+                rebuild_cfg, Path(scratch) / "rebuild", workers, holdout_seed_file=holdout_seed_file
+            )
+            findings["rebuild_manifest_equal"] = rep["manifest_sha256"] == claimed
     # cue association: visible ALARM state vs the answer class, by question kind
     cue: dict[str, Any] = {}
     for kind in ("state", "consistency"):
@@ -781,7 +990,10 @@ def audit_dataset(root: Path, rebuild_cfg: Path | None = None, workers: int = 1)
         and findings["images_in_multiple_splits"] == 0
         and findings["seed_overlap_dev_frozen"] == 0
         and leaked == 0
+        and bad_pairs == 0
         and not drift
+        and findings["manifest_sha256_valid"]
+        and findings["dataset_purpose_valid"]
         and findings.get("rebuild_manifest_equal", True)
     )
     return findings
@@ -792,14 +1004,19 @@ def main_build(argv: list[str]) -> int:
     ap.add_argument("--config", default=str(repo_root() / "configs" / "benchmark.yaml"))
     ap.add_argument("--out", required=True)
     ap.add_argument("--workers", type=int, default=None)
+    ap.add_argument("--holdout-seed-file", type=Path, help="local seed file for a measured holdout")
     a = ap.parse_args(argv)
-    rep = build_dataset(Path(a.config), Path(a.out), a.workers)
+    try:
+        rep = build_dataset(Path(a.config), Path(a.out), a.workers, holdout_seed_file=a.holdout_seed_file)
+    except (OSError, ValueError) as error:
+        ap.error(str(error))
     print(
         json.dumps(
             {
                 k: rep[k]
                 for k in (
                     "manifest_sha256",
+                    "dataset_purpose",
                     "accepted_answerable_tasks",
                     "skills",
                     "pairs",
@@ -821,8 +1038,17 @@ def main_audit(argv: list[str]) -> int:
     ap.add_argument("--rebuild-config", default=None)
     ap.add_argument("--workers", type=int, default=1)
     ap.add_argument("--out", default=None)
+    ap.add_argument("--holdout-seed-file", type=Path, help="matching local seed file for a holdout rebuild")
     a = ap.parse_args(argv)
-    f = audit_dataset(Path(a.dataset), Path(a.rebuild_config) if a.rebuild_config else None, a.workers)
+    try:
+        f = audit_dataset(
+            Path(a.dataset),
+            Path(a.rebuild_config) if a.rebuild_config else None,
+            a.workers,
+            holdout_seed_file=a.holdout_seed_file,
+        )
+    except (OSError, ValueError) as error:
+        ap.error(str(error))
     if a.out:
         Path(a.out).write_text(json.dumps(f, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(json.dumps(f, indent=2))

@@ -6,6 +6,7 @@ const LABEL: Record<JobStatus, { icon: string; text: string; cls: string }> = {
   running: { icon: "↻", text: "Running", cls: "border-primary text-primary" },
   succeeded: { icon: "✓", text: "Succeeded", cls: "border-success text-success" },
   failed: { icon: "✕", text: "Failed", cls: "border-danger text-danger" },
+  expired: { icon: "–", text: "Expired", cls: "border-border text-muted-foreground" },
 };
 
 export function RunStatus({ status, error }: { status: JobStatus; error?: string | null }) {
@@ -26,7 +27,9 @@ export function RunStatus({ status, error }: { status: JobStatus; error?: string
         </span>
         Job {m.text}
       </span>
-      {status === "failed" && error ? <p className="text-sm text-danger">{error}</p> : null}
+      {error && (status === "failed" || status === "expired") ? (
+        <p className="text-sm text-danger">{error}</p>
+      ) : null}
     </div>
   );
 }

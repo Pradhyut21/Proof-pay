@@ -14,7 +14,11 @@ Metrics compare conditions on **matched tasks only**. Tasks missing a condition 
 
 ## Measured runs need a freeze
 
-With `--measured`, `metrics` requires a dataset freeze manifest and a recorded access approval whose selection hash matches (`require_freeze`), so a run cannot be quietly retargeted after results are seen. Without the flag the report is for development only. Before a measured run record the authorizing account, provider and model revision, selection hash, conditions, caps and the exact command.
+Use `--measured --attempt-format contract` only with a privately seeded holdout built by the exporter. Supply its dataset directory via `--tasks`, one `--attempts` argument per run, and `--approval` pointing to the team’s local authorization record. Keep each attempt file alongside its original `run.json`. The report checks the holdout's role and hashes, model provenance, and an identical nonempty cohort across the conditions of every model. Public reproducibility builds, development and diagnostic tasks, and mock attempts are rejected. A partial cohort with skipped tasks can be inspected as a development report.
+
+The authorization record includes `approved_by`, the holdout's `manifest_sha256`, the `selection_hash` from `panelproof.metrics.selection_hash(task_ids, conditions)`, and `models`, an array of objects with `provider`, `model_id`, and `model_revision`. This selection hash covers the approved unordered task IDs and conditions. The runner's separate `selected_task_ids_sha256` covers the ordered rows within each run. Include approved limits and exact run commands in the team's local lock record before requesting model inference.
+
+The reporting gate validates artifacts after inference. Obtain authorization and commit to the selected task IDs and conditions before starting requests. A report assembled without `--measured` is labeled development or **DEMO ONLY**. The real provider runner currently accepts C0 and C1. C3 is exercised by the offline fixture.
 
 ## Reported quantities
 

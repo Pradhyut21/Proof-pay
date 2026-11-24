@@ -11,6 +11,7 @@ import { isValidSeed } from "@/lib/utils";
 import type { Difficulty, Job, PublicTask } from "@/lib/types";
 
 const POLL_MS = 1000;
+const ACTIVE_POLL_MS = 3000;
 const MAX_COUNT = 4;
 
 export default function FactoryPage() {
@@ -21,25 +22,43 @@ export default function FactoryPage() {
   const [tasks, setTasks] = useState<PublicTask[]>([]);
   const [error, setError] = useState<string>();
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const request = useRef(0);
 
-  useEffect(() => () => clearTimeout(timer.current), []);
+  useEffect(
+    () => () => {
+      request.current += 1;
+      clearTimeout(timer.current);
+    },
+    [],
+  );
 
-  async function loadTasks(ids: string[]) {
-    const wanted = new Set(ids);
-    const page = await api.listTasks("factory");
-    setTasks(page.items.filter((t) => wanted.has(t.task_id)).slice(0, 4));
-  }
-
-  async function poll(id: string) {
+  async function poll(id: string, version: number, loaded = false) {
+    if (version !== request.current) return;
     try {
       const j = await api.getJob(id);
+      if (version !== request.current) return;
       setJob(j);
       if (j.status === "succeeded") {
-        await loadTasks(j.task_ids);
-      } else if (j.status !== "failed") {
-        timer.current = setTimeout(() => void poll(id), POLL_MS);
+        if (!loaded) {
+          const wanted = new Set(j.task_ids);
+          const page = await api.listTasks("factory", undefined, id);
+          if (version !== request.current) return;
+          setTasks(page.items.filter((t) => wanted.has(t.task_id)).slice(0, 4));
+        }
+        timer.current = setTimeout(() => void poll(id, version, true), ACTIVE_POLL_MS);
+      } else if (j.status === "running" || j.status === "queued") {
+        timer.current = setTimeout(() => void poll(id, version), POLL_MS);
+      } else {
+        setTasks([]);
       }
     } catch (e) {
+      if (version !== request.current) return;
+      if (e instanceof ApiError && e.status === 410) {
+        setTasks([]);
+        timer.current = setTimeout(() => void poll(id, version), POLL_MS);
+        return;
+      }
+      setTasks([]);
       setError(e instanceof ApiError ? e.message : "Unexpected error while polling the job.");
     }
   }
@@ -47,7 +66,6 @@ export default function FactoryPage() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(undefined);
-    setTasks([]);
     const n = Number(count);
     if (!isValidSeed(seed)) {
       setError("Seed must be 1–40 characters: letters, digits, dash or underscore.");
@@ -57,11 +75,17 @@ export default function FactoryPage() {
       setError(`Count must be a whole number from 1 to ${MAX_COUNT}.`);
       return;
     }
+    clearTimeout(timer.current);
+    const version = ++request.current;
+    setTasks([]);
     try {
       const j = await api.startJob(seed, n, difficulty);
+      if (version !== request.current) return;
       setJob(j);
-      void poll(j.job_id);
+      void poll(j.job_id, version);
     } catch (err) {
+      if (version !== request.current) return;
+      setJob(undefined);
       setError(err instanceof ApiError ? err.message : "Could not start the job.");
     }
   }
@@ -122,14 +146,14 @@ export default function FactoryPage() {
         </p>
       ) : null}
       {job ? <RunStatus status={job.status} error={job.error} /> : null}
-      {job?.reused ? (
+      {job?.status === "succeeded" && job.reused ? (
         <p className="text-sm">This seed was generated before; showing the existing tasks.</p>
       ) : null}
       <div className="grid gap-6 lg:grid-cols-2">
         {tasks.map((t, i) => (
           <Card key={t.task_id} className="space-y-4">
-            <PanelViewer set="factory" task={t} label={`Panel ${i + 1}`} />
-            <QuestionForm set="factory" task={t} />
+            <PanelViewer set="factory" task={t} label={`Panel ${i + 1}`} job={job?.job_id} />
+            <QuestionForm set="factory" task={t} job={job?.job_id} />
           </Card>
         ))}
       </div>

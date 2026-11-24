@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { startJob, validateJobInput } from "@/lib/server/jobs";
+import { FactoryBusy, startJob, validateJobInput } from "@/lib/server/jobs";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -15,6 +15,12 @@ export async function POST(req: NextRequest) {
   }
   const v = validateJobInput(input);
   if (typeof v === "string") return Response.json({ error: v }, { status: 422 });
-  const job = await startJob(v.seed, v.count, v.difficulty);
-  return Response.json(job, { status: 202 });
+  try {
+    return Response.json(startJob(v.seed, v.count, v.difficulty), { status: 202 });
+  } catch (error) {
+    if (error instanceof FactoryBusy) {
+      return Response.json({ error: error.message }, { status: 409 });
+    }
+    return Response.json({ error: "The factory could not persist a job." }, { status: 503 });
+  }
 }
