@@ -15,8 +15,10 @@ import re
 import shutil
 import stat
 from collections import Counter, defaultdict
+from collections.abc import Iterable
 from concurrent.futures import ProcessPoolExecutor
 from contextlib import nullcontext
+from functools import cache
 from pathlib import Path, PurePosixPath
 from tempfile import TemporaryDirectory, mkdtemp
 from typing import Any
@@ -42,6 +44,13 @@ from .verify import VERIFIER_VERSION, verify_png
 
 PUBLIC_KEYS = {"schema_version", "task_id", "image_path", "question", "public_rules", "response_schema"}
 SPLIT_TO_CONTRACT = {"dev": "dev", "frozen_main": "test_frozen", "frozen_heldout_style": "test_frozen"}
+X_SELECTION_PATH = "public/x_balanced_selection.json"
+X_CELL_NAMES = (
+    "expected_off_observed_off",
+    "expected_off_observed_on",
+    "expected_on_observed_off",
+    "expected_on_observed_on",
+)
 VARIANT_TO_CONTRACT = {
     "base": "original",
     "semantic": "semantic",
@@ -459,8 +468,13 @@ def _generate_dataset(
         json.dumps(units["report"], indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
 
+    x_selection = select_balanced_x(priv)
+    (out / X_SELECTION_PATH).write_text(
+        json.dumps(x_selection, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     manifest = _manifest(out, cfg, gcfg, metadata)
     report = _report(cfg, (attempts, base_attempts), accepted, variants, tasks, ledger, units, manifest)
+    report["x_balanced_selection"] = _x_selection_summary(x_selection)
     (out / "dataset_report.json").write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     _write_samples(out, cfg, priv, pub)
     return report
@@ -473,6 +487,168 @@ def semantic_key(scene: Scene) -> str:
         for p in scene.pumps
     ]
     return hashlib.sha256(canonical_json(sig)).hexdigest()
+
+
+def _x_cell(row: dict[str, Any]) -> int:
+    observed = row["alarm_on"]
+    answer = row["answer"]["value"]
+    if type(observed) is not bool or answer not in {"CONSISTENT", "CONTRADICTION"}:
+        raise ValueError("X task is missing its binary alarm and consistency categories")
+    expected = observed if answer == "CONSISTENT" else not observed
+    return 2 * expected + observed
+
+
+def _x_components(
+    rows: list[dict[str, Any]],
+) -> tuple[dict[str, list[list[dict[str, Any]]]], dict[str, list[str]]]:
+    by_id = {row["task_id"]: row for row in rows}
+    if len(by_id) != len(rows):
+        raise ValueError("duplicate X task ID")
+    parents = {task_id: task_id for task_id in by_id}
+    pairs: dict[str, list[str]] = defaultdict(list)
+
+    def find(task_id: str) -> str:
+        while parents[task_id] != task_id:
+            parents[task_id] = parents[parents[task_id]]
+            task_id = parents[task_id]
+        return task_id
+
+    for task_id, row in by_id.items():
+        for pair_id in row.get("pair_ids") or ([row["pair_id"]] if row.get("pair_id") else []):
+            pairs[pair_id].append(task_id)
+    for members in pairs.values():
+        if len(set(members)) != 2 or len(members) != 2:
+            raise ValueError("X pair must have exactly two distinct members")
+        left, right = members
+        if by_id[left]["split"] != by_id[right]["split"]:
+            raise ValueError("X pair crosses dataset splits")
+        parents[find(left)] = find(right)
+
+    linked: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for task_id, row in by_id.items():
+        if row["split"] not in SPLIT_TO_CONTRACT:
+            raise ValueError("X task has an unknown dataset split")
+        linked[find(task_id)].append(row)
+
+    by_split: dict[str, list[list[dict[str, Any]]]] = defaultdict(list)
+    for component in linked.values():
+        by_split[component[0]["split"]].append(component)
+    return by_split, pairs
+
+
+def _x_counts(rows: Iterable[dict[str, Any]]) -> tuple[int, ...]:
+    counts = Counter(_x_cell(row) for row in rows)
+    return tuple(counts[index] for index in range(len(X_CELL_NAMES)))
+
+
+def _largest_balanced_x_components(
+    components: list[list[dict[str, Any]]], target: int
+) -> list[list[dict[str, Any]]]:
+    """Find the largest equal-cell cohort by packing whole pair components."""
+    by_shape: dict[tuple[int, ...], list[list[dict[str, Any]]]] = defaultdict(list)
+    for component in components:
+        shape = _x_counts(component)
+        if all(count <= target for count in shape):
+            by_shape[shape].append(component)
+    # Components with the same shape are interchangeable for balance. Larger shapes constrain
+    # the answer first, leaving single-cell components available to fill any gaps.
+    shapes = sorted(by_shape, key=lambda shape: (-sum(shape), shape))
+    availability = [(0,) * len(X_CELL_NAMES)] * (len(shapes) + 1)
+    for index in range(len(shapes) - 1, -1, -1):
+        shape = shapes[index]
+        availability[index] = tuple(
+            after + count * len(by_shape[shape])
+            for after, count in zip(availability[index + 1], shape, strict=True)
+        )
+
+    @cache
+    def solve(index: int, remaining: tuple[int, ...]) -> tuple[int, ...] | None:
+        if index == len(shapes):
+            return () if not any(remaining) else None
+        if any(need > have for need, have in zip(remaining, availability[index], strict=True)):
+            return None
+        shape = shapes[index]
+        active_cells = [
+            (need, count, after)
+            for need, count, after in zip(remaining, shape, availability[index + 1], strict=True)
+            if count
+        ]
+        maximum = min(len(by_shape[shape]), min(need // count for need, count, _ in active_cells))
+        minimum = max(
+            0, max((need - after + count - 1) // count for need, count, after in active_cells)
+        )
+        for quantity in range(maximum, minimum - 1, -1):
+            rest = tuple(need - quantity * count for need, count in zip(remaining, shape, strict=True))
+            suffix = solve(index + 1, rest)
+            if suffix is not None:
+                return (quantity, *suffix)
+        return None
+
+    for per_cell in range(target, 0, -1):
+        quantities = solve(0, (per_cell,) * len(X_CELL_NAMES))
+        if quantities is not None:
+            return [
+                component
+                for shape, quantity in zip(shapes, quantities, strict=True)
+                for component in by_shape[shape][:quantity]
+            ]
+    return []
+
+
+def _x_cue_shift(counts: tuple[int, ...]) -> float | None:
+    off_off, off_on, on_off, on_on = counts
+    observed_off, observed_on = off_off + on_off, off_on + on_on
+    if not observed_off or not observed_on:
+        return None
+    return round(100 * abs(off_off / observed_off - on_on / observed_on), 3)
+
+
+def select_balanced_x(private_tasks: Iterable[dict[str, Any]]) -> dict[str, Any]:
+    """Select complete X pair components with equally populated expected/observed lamp cells."""
+    rows = sorted(
+        (row for row in private_tasks if row["set"] == "main" and row["kind"] == "consistency"),
+        key=lambda row: row["task_id"],
+    )
+    by_split, original_pairs = _x_components(rows)
+    result: dict[str, Any] = {
+        "schema_version": SCHEMA_VERSION,
+        "selector": "x-four-cell-pairs-v1",
+        "splits": {},
+    }
+    for split in SPLIT_TO_CONTRACT:
+        components = by_split[split]
+        before = _x_counts(row for component in components for row in component)
+        selected = _largest_balanced_x_components(components, min(before))
+        selected_rows = [row for component in selected for row in component]
+        after = _x_counts(selected_rows)
+        task_ids = sorted(row["task_id"] for row in selected_rows)
+        task_id_set = set(task_ids)
+        status = "balanced"
+        if not task_ids:
+            status = "infeasible_with_pairs" if min(before) else "missing_cell"
+        result["splits"][split] = {
+            "status": status,
+            "task_ids": task_ids,
+            "task_ids_sha256": sha(canonical_json(task_ids)),
+            "eligible_count": sum(before),
+            "selected_count": len(task_ids),
+            "eligible_cell_counts": dict(zip(X_CELL_NAMES, before, strict=True)),
+            "selected_cell_counts": dict(zip(X_CELL_NAMES, after, strict=True)),
+            "eligible_max_cue_shift_pp": _x_cue_shift(before),
+            "selected_max_cue_shift_pp": _x_cue_shift(after),
+            "selected_component_count": len(selected),
+            "selected_pair_count": sum(
+                all(member in task_id_set for member in pair) for pair in original_pairs.values()
+            ),
+        }
+    return result
+
+
+def _x_selection_summary(selection: dict[str, Any]) -> dict[str, Any]:
+    return {
+        split: {key: value for key, value in cohort.items() if key != "task_ids"}
+        for split, cohort in selection["splits"].items()
+    }
 
 
 def _split_units(accepted: list[dict[str, Any]], cfg: dict[str, Any]) -> dict[str, Any]:
@@ -875,6 +1051,35 @@ def _manifest_file_drift(root: Path, files: dict[str, str]) -> list[str]:
     return sorted(drift)
 
 
+def _audit_x_selection(
+    root: Path,
+    private_tasks: list[dict[str, Any]],
+    public_ids: dict[str, set[str]],
+    public_files: dict[str, str],
+    drift: list[str],
+) -> dict[str, Any]:
+    file = root / X_SELECTION_PATH
+    if X_SELECTION_PATH not in public_files:
+        present = file.exists()
+        return {"present": present, "valid": not present}
+    if X_SELECTION_PATH in drift:
+        return {"present": file.exists(), "valid": False}
+    try:
+        stored = json.loads(file.read_text(encoding="utf-8"))
+        expected = select_balanced_x(private_tasks)
+    except (ValueError, KeyError, TypeError):
+        return {"present": True, "valid": False}
+    matched_public_tasks = all(
+        set(cohort["task_ids"]) <= public_ids["dev" if split == "dev" else "frozen"]
+        for split, cohort in expected["splits"].items()
+    )
+    return {
+        "present": True,
+        "valid": stored == expected and matched_public_tasks,
+        "splits": _x_selection_summary(expected),
+    }
+
+
 def audit_dataset(
     root: Path,
     rebuild_cfg: Path | None = None,
@@ -909,12 +1114,15 @@ def audit_dataset(
     seeds = {p["seed"] for p in priv}
     seed_prefixes = {s.split(":", 1)[0] for s in seeds}
     seeds.update(prefix for prefix in seed_prefixes if re.fullmatch(r"[0-9a-f]{64}", prefix))
+    public_ids: dict[str, set[str]] = defaultdict(set)
     for f in sorted((root / "public").glob("*.jsonl")):
         raw = f.read_text(encoding="utf-8")
         for line in raw.splitlines():
             rec = json.loads(line)
             if set(rec) != PUBLIC_KEYS:
                 leaked += 1
+            else:
+                public_ids[f.stem].add(rec["task_id"])
         leaked += sum(1 for s in seeds if s in raw)
     findings["public_records_with_private_fields_or_seeds"] = leaked
     findings["private_answer_records"] = len(answers_text)
@@ -956,6 +1164,9 @@ def audit_dataset(
         and not _in_checkout(root.resolve())
     )
     findings["files_with_hash_drift"] = drift
+    findings["x_balanced_selection"] = _audit_x_selection(
+        root, priv, public_ids, man["public_files"], drift
+    )
     if holdout_seed_file is not None and (rebuild_cfg is None or purpose != "measured_holdout"):
         raise ValueError("holdout seed file is only used to rebuild a measured holdout")
     if rebuild_cfg:
@@ -994,6 +1205,7 @@ def audit_dataset(
         and not drift
         and findings["manifest_sha256_valid"]
         and findings["dataset_purpose_valid"]
+        and findings["x_balanced_selection"]["valid"]
         and findings.get("rebuild_manifest_equal", True)
     )
     return findings
