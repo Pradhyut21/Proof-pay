@@ -6,9 +6,11 @@ from itertools import product
 import pytest
 
 from panelproof.export import (
+    OLD_PUBLIC_X_SELECTION_PATH,
     X_CELL_NAMES,
     X_SELECTION_PATH,
     _audit_x_selection,
+    _manifest,
     canonical_json,
     select_balanced_x,
     sha,
@@ -135,23 +137,38 @@ def test_optimality_matches_brute_force_for_small_deterministic_cohorts():
         assert select_balanced_x(rows)["splits"]["dev"]["selected_count"] == largest
 
 
-def test_audit_rejects_changed_uncommitted_or_non_public_selection(tmp_path):
+def test_audit_requires_private_commitment_and_linked_public_tasks(tmp_path):
     rows = [task(f"t{cell}", cell) for cell in range(4)]
     plan = select_balanced_x(rows)
     path = tmp_path / X_SELECTION_PATH
     path.parent.mkdir()
     path.write_text(json.dumps(plan), encoding="utf-8")
     public_ids = {"dev": {row["task_id"] for row in rows}, "frozen": set()}
-    commitments = {X_SELECTION_PATH: sha(path.read_bytes())}
+    manifest = _manifest(tmp_path, {"dataset_version": "test"}, {}, {"dataset_purpose": "repro"})
+    assert X_SELECTION_PATH not in manifest["public_files"]
+    assert manifest["private_commitments"][X_SELECTION_PATH] == sha(path.read_bytes())
 
-    assert _audit_x_selection(tmp_path, rows, public_ids, commitments, [])["valid"]
-    assert not _audit_x_selection(tmp_path, rows, public_ids, {}, [])["valid"]
-    assert not _audit_x_selection(tmp_path, rows, public_ids, commitments, [X_SELECTION_PATH])[
+    audited = _audit_x_selection(tmp_path, rows, public_ids, manifest, [])
+    assert audited["valid"]
+    assert {"task_ids", "task_ids_sha256"}.isdisjoint(audited["splits"]["dev"])
+    assert not _audit_x_selection(tmp_path, rows, public_ids, manifest, [X_SELECTION_PATH])["valid"]
+    assert not _audit_x_selection(tmp_path, rows, {"dev": {"t0"}, "frozen": set()}, manifest, [])[
         "valid"
     ]
-    assert not _audit_x_selection(
-        tmp_path, rows, {"dev": {"t0"}, "frozen": set()}, commitments, []
-    )["valid"]
+    uncommitted = manifest | {"private_commitments": {}}
+    assert not _audit_x_selection(tmp_path, rows, public_ids, uncommitted, [])["valid"]
     plan["splits"]["dev"]["task_ids"].remove("t0")
     path.write_text(json.dumps(plan), encoding="utf-8")
-    assert not _audit_x_selection(tmp_path, rows, public_ids, commitments, [])["valid"]
+    assert not _audit_x_selection(tmp_path, rows, public_ids, manifest, [])["valid"]
+
+
+def test_audit_rejects_legacy_public_selection(tmp_path):
+    path = tmp_path / OLD_PUBLIC_X_SELECTION_PATH
+    path.parent.mkdir()
+    path.write_text("{}", encoding="utf-8")
+    manifest = {"public_files": {}, "private_commitments": {}}
+    finding = _audit_x_selection(tmp_path, [], {}, manifest, [])
+    assert finding == {"present": True, "valid": False, "reason": "selection_exposed_publicly"}
+    path.unlink()
+    manifest["public_files"][X_SELECTION_PATH] = "a" * 64
+    assert _audit_x_selection(tmp_path, [], {}, manifest, []) == finding

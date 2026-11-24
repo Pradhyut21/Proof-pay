@@ -44,7 +44,8 @@ from .verify import VERIFIER_VERSION, verify_png
 
 PUBLIC_KEYS = {"schema_version", "task_id", "image_path", "question", "public_rules", "response_schema"}
 SPLIT_TO_CONTRACT = {"dev": "dev", "frozen_main": "test_frozen", "frozen_heldout_style": "test_frozen"}
-X_SELECTION_PATH = "public/x_balanced_selection.json"
+X_SELECTION_PATH = "private/x_balanced_selection.json"
+OLD_PUBLIC_X_SELECTION_PATH = "public/x_balanced_selection.json"
 X_CELL_NAMES = (
     "expected_off_observed_off",
     "expected_off_observed_on",
@@ -646,7 +647,11 @@ def select_balanced_x(private_tasks: Iterable[dict[str, Any]]) -> dict[str, Any]
 
 def _x_selection_summary(selection: dict[str, Any]) -> dict[str, Any]:
     return {
-        split: {key: value for key, value in cohort.items() if key != "task_ids"}
+        split: {
+            key: value
+            for key, value in cohort.items()
+            if key not in {"task_ids", "task_ids_sha256"}
+        }
         for split, cohort in selection["splits"].items()
     }
 
@@ -1055,11 +1060,18 @@ def _audit_x_selection(
     root: Path,
     private_tasks: list[dict[str, Any]],
     public_ids: dict[str, set[str]],
-    public_files: dict[str, str],
+    manifest: dict[str, Any],
     drift: list[str],
 ) -> dict[str, Any]:
     file = root / X_SELECTION_PATH
-    if X_SELECTION_PATH not in public_files:
+    public = manifest["public_files"]
+    if (
+        OLD_PUBLIC_X_SELECTION_PATH in public
+        or X_SELECTION_PATH in public
+        or (root / OLD_PUBLIC_X_SELECTION_PATH).exists()
+    ):
+        return {"present": True, "valid": False, "reason": "selection_exposed_publicly"}
+    if X_SELECTION_PATH not in manifest["private_commitments"]:
         present = file.exists()
         return {"present": present, "valid": not present}
     if X_SELECTION_PATH in drift:
@@ -1164,9 +1176,7 @@ def audit_dataset(
         and not _in_checkout(root.resolve())
     )
     findings["files_with_hash_drift"] = drift
-    findings["x_balanced_selection"] = _audit_x_selection(
-        root, priv, public_ids, man["public_files"], drift
-    )
+    findings["x_balanced_selection"] = _audit_x_selection(root, priv, public_ids, man, drift)
     if holdout_seed_file is not None and (rebuild_cfg is None or purpose != "measured_holdout"):
         raise ValueError("holdout seed file is only used to rebuild a measured holdout")
     if rebuild_cfg:
