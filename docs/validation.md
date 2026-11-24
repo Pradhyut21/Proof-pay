@@ -10,11 +10,11 @@ A base scene is accepted only if all of these hold (`export.py`):
 2. The independent raster verifier returns `verified` for every pump, using only the PNG.
 3. The verifier's recovered readings agree with the scene truth (`validate.compare_trace_to_scene`).
 
-Result for the build: 120 base scenes attempted, 110 accepted (91.7%). Rejections: 4 `INLET:numerals_unreadable`, 15 `make_missing:no_valid_edit`, 4 `make_preserving:no_valid_edit`, 2 `make_semantic_flip:no_valid_edit`. Accepted variants over attempted: 99.5%. See `results/dataset_report.json`.
+The historical v0.1.0 build accepted 110 of 120 attempted base scenes (91.7%). Its recorded rejections include 4 unreadable inlet labels, 15 missing-evidence edits, 4 preserving edits, and 2 semantic edits. The acceptance rate for attempted variants was 99.5%. [Historical dataset report](results/dataset_report.json)
 
 ## 2. Dataset audit (`./run.sh audit`)
 
-`results/dataset_audit.json`, `pass: true`:
+The [historical v0.1.0 dataset audit](results/dataset_audit.json) passed these checks. The [current v0.2 holdout audit](dataset_card.md#current-private-holdout) reports separately.
 
 | Check | Result |
 | --- | --- |
@@ -28,12 +28,12 @@ Result for the build: 120 base scenes attempted, 110 accepted (91.7%). Rejection
 
 **Answer-class shortcut check.** Answer distributions by ALARM lamp state:
 
-- State tasks (n=291): maximum shift 1.3 percentage points. No ALARM shortcut.
-- Consistency tasks (n=264): maximum shift **28.0 percentage points**. When ALARM is off, `CONSISTENT` is 64.8% of tasks; when on, `CONTRADICTION` is 63.2%. A model that reads only the ALARM lamp can beat chance on X tasks. X results must be read with this in mind; it is a known limitation, not a resolved one.
+- State tasks (n=291) had a maximum shift of 1.3 percentage points.
+- Consistency tasks (n=264) had a maximum shift of **28.0 percentage points**. When ALARM is off, `CONSISTENT` is 64.8% of tasks. When on, `CONTRADICTION` is 63.2%. The v0.2 [balanced X slices](dataset_card.md#current-private-holdout) audit this cue separately from the full cohort.
 
 ## 3. Raster verifier under perturbation
 
-`python -m panelproof.cli perturb --dataset data/build/main --limit 30` renders 30 base scenes and applies each perturbation. The scene truth is regenerated from the private seed. Output: `results/perturbation.json`.
+`python -m panelproof.cli perturb --dataset data/build/main --limit 30` renders 30 base scenes and applies each perturbation. The scene truth is regenerated from the private seed. [Historical perturbation report](results/perturbation.json)
 
 | Perturbation | Verified correct | Rejected | Verified wrong (false accept) |
 | --- | --- | --- | --- |
@@ -49,7 +49,7 @@ Result for the build: 120 base scenes attempted, 110 accepted (91.7%). Rejection
 
 Reading the table honestly:
 
-- No perturbation produced a wrong accepted reading (0 of 270 images), so failures are safe rejections.
+- The recorded run had zero incorrect accepted readings across 270 images. Failures in this sample were verifier rejections.
 - The stress test shows fragility outside clean renders. Recovery dropped to 0 of 30 under 1° rotation or sigma-3 noise, 10 of 30 under 0.97 scaling, 14 of 30 with glare, and 19 of 30 for JPEG quality 90.
 - The 30-scene sample is small and drawn from the first 30 accepted base groups, so rates have wide uncertainty. Real photographs are out of scope.
 - The first run of this study (before the unit table change to psi = 6.894757293168 kPa) reported false accepts under glare. The current run, on the rebuilt dataset, reports none. The scenes and unit table differ between the runs and the cause of the change was not isolated, so the earlier false accepts are not evidence of a fix and glare remains a risk worth re-testing on more scenes.
@@ -68,6 +68,6 @@ Reading the table honestly:
 
 `results/human_audit_worksheet.csv` lists 50 tasks sampled across skills for a human reviewer. **No human has reviewed any task.** `results/human_audit_status.json` records zero reviewers and no agreement statistic. Until a person completes the worksheet, task answerability and ambiguity are validated only by the automated checks above.
 
-## What this does not show
+## Scope of the evidence
 
-No model has been evaluated (all report outputs are DEMO ONLY). The generator and verifier share a repository, so verifier agreement shows internal consistency, not agreement with an independent reader. Docker, Compose and macOS paths were not run.
+Raster agreement compares the generator and verifier within this repository. Human judgments and authorized live model results remain pending. Later platform checks cover Compose build and startup, macOS core tests, and the Windows browser walkthrough. [Current evidence status](evaluation_results.md) · [Platform checks](https://github.com/Pradhyut21/Proof-pay/actions/runs/45449232901)
