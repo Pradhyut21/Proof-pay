@@ -22,7 +22,13 @@ const SKILLS = [
   'operational_state',
   'indicator_consistency',
 ] as const;
-const VARIANTS = ['original', 'semantic', 'semantic_preserve', 'nonsemantic', 'evidence_removed'] as const;
+const VARIANTS = [
+  'original',
+  'semantic',
+  'semantic_preserve',
+  'nonsemantic',
+  'evidence_removed',
+] as const;
 const VALIDATION_STATUSES = ['pending', 'accepted', 'rejected'] as const;
 
 type Condition = (typeof CONDITIONS)[number];
@@ -417,7 +423,7 @@ export function isAttempt(value: unknown): value is Attempt {
     isOptional(value.model_revision, isLabel) &&
     isOptional(value.raw_output, isString) &&
     isOptional(value.parsed_answer, isAnswer) &&
-    (isChoice(value.status, ANSWERED_STATUSES) === (value.parsed_answer != null)) &&
+    isChoice(value.status, ANSWERED_STATUSES) === (value.parsed_answer != null) &&
     isOptional(value.error, isString) &&
     isOptional(value.input_tokens, isNonNegativeInteger) &&
     isOptional(value.output_tokens, isNonNegativeInteger) &&

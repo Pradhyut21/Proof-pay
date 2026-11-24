@@ -1,14 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import {
-  isAnswer,
-  isAttempt,
-  isPrivateTask,
-  isPublicTask,
-  isRun,
-  isScene,
-} from './contracts.ts';
+import { isAnswer, isAttempt, isPrivateTask, isPublicTask, isRun, isScene } from './contracts.ts';
 
 function example(name) {
   const path = new URL('../../../schemas/examples/' + name + '.json', import.meta.url);
