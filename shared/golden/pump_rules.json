@@ -1,0 +1,362 @@
+[
+  {
+    "id": "stopped-zero",
+    "inlet": {
+      "value_milli": 0,
+      "unit": "kPa"
+    },
+    "outlet": {
+      "value_milli": 0,
+      "unit": "kPa"
+    },
+    "run": false,
+    "alarm": false,
+    "expected_state": "STOPPED",
+    "expected_consistency": "CONSISTENT"
+  },
+  {
+    "id": "stopped-alarm-lit",
+    "inlet": {
+      "value_milli": 100000,
+      "unit": "kPa"
+    },
+    "outlet": {
+      "value_milli": 300000,
+      "unit": "kPa"
+    },
+    "run": false,
+    "alarm": true,
+    "expected_state": "STOPPED",
+    "expected_consistency": "CONTRADICTION"
+  },
+  {
+    "id": "stopped-sufficient-pressure",
+    "inlet": {
+      "value_milli": 1000,
+      "unit": "bar"
+    },
+    "outlet": {
+      "value_milli": 6000,
+      "unit": "bar"
+    },
+    "run": false,
+    "alarm": false,
+    "expected_state": "STOPPED",
+    "expected_consistency": "CONSISTENT"
+  },
+  {
+    "id": "exact-threshold",
+    "inlet": {
+      "value_milli": 100000,
+      "unit": "kPa"
+    },
+    "outlet": {
+      "value_milli": 400000,
+      "unit": "kPa"
+    },
+    "run": true,
+    "alarm": false,
+    "expected_state": "NORMAL",
+    "expected_consistency": "CONSISTENT"
+  },
+  {
+    "id": "one-milli-below",
+    "inlet": {
+      "value_milli": 100000,
+      "unit": "kPa"
+    },
+    "outlet": {
+      "value_milli": 399999,
+      "unit": "kPa"
+    },
+    "run": true,
+    "alarm": true,
+    "expected_state": "LOW_PRESSURE",
+    "expected_consistency": "CONSISTENT"
+  },
+  {
+    "id": "one-milli-above",
+    "inlet": {
+      "value_milli": 100000,
+      "unit": "kPa"
+    },
+    "outlet": {
+      "value_milli": 400001,
+      "unit": "kPa"
+    },
+    "run": true,
+    "alarm": false,
+    "expected_state": "NORMAL",
+    "expected_consistency": "CONSISTENT"
+  },
+  {
+    "id": "normal-alarm-lit",
+    "inlet": {
+      "value_milli": 100000,
+      "unit": "kPa"
+    },
+    "outlet": {
+      "value_milli": 450000,
+      "unit": "kPa"
+    },
+    "run": true,
+    "alarm": true,
+    "expected_state": "NORMAL",
+    "expected_consistency": "CONTRADICTION"
+  },
+  {
+    "id": "low-alarm-dark",
+    "inlet": {
+      "value_milli": 100000,
+      "unit": "kPa"
+    },
+    "outlet": {
+      "value_milli": 350000,
+      "unit": "kPa"
+    },
+    "run": true,
+    "alarm": false,
+    "expected_state": "LOW_PRESSURE",
+    "expected_consistency": "CONTRADICTION"
+  },
+  {
+    "id": "reversed-pressure",
+    "inlet": {
+      "value_milli": 450000,
+      "unit": "kPa"
+    },
+    "outlet": {
+      "value_milli": 100000,
+      "unit": "kPa"
+    },
+    "run": true,
+    "alarm": true,
+    "expected_state": "LOW_PRESSURE",
+    "expected_consistency": "CONSISTENT"
+  },
+  {
+    "id": "zero-difference",
+    "inlet": {
+      "value_milli": 400000,
+      "unit": "kPa"
+    },
+    "outlet": {
+      "value_milli": 400000,
+      "unit": "kPa"
+    },
+    "run": true,
+    "alarm": false,
+    "expected_state": "LOW_PRESSURE",
+    "expected_consistency": "CONTRADICTION"
+  },
+  {
+    "id": "bar-to-bar-exact",
+    "inlet": {
+      "value_milli": 1000,
+      "unit": "bar"
+    },
+    "outlet": {
+      "value_milli": 4000,
+      "unit": "bar"
+    },
+    "run": true,
+    "alarm": false,
+    "expected_state": "NORMAL",
+    "expected_consistency": "CONSISTENT"
+  },
+  {
+    "id": "kpa-to-bar-exact",
+    "inlet": {
+      "value_milli": 100000,
+      "unit": "kPa"
+    },
+    "outlet": {
+      "value_milli": 4000,
+      "unit": "bar"
+    },
+    "run": true,
+    "alarm": false,
+    "expected_state": "NORMAL",
+    "expected_consistency": "CONSISTENT"
+  },
+  {
+    "id": "bar-to-kpa-below",
+    "inlet": {
+      "value_milli": 1000,
+      "unit": "bar"
+    },
+    "outlet": {
+      "value_milli": 399999,
+      "unit": "kPa"
+    },
+    "run": true,
+    "alarm": true,
+    "expected_state": "LOW_PRESSURE",
+    "expected_consistency": "CONSISTENT"
+  },
+  {
+    "id": "kpa-to-psi-normal",
+    "inlet": {
+      "value_milli": 30000,
+      "unit": "kPa"
+    },
+    "outlet": {
+      "value_milli": 50000,
+      "unit": "psi"
+    },
+    "run": true,
+    "alarm": false,
+    "expected_state": "NORMAL",
+    "expected_consistency": "CONSISTENT"
+  },
+  {
+    "id": "psi-to-psi-low",
+    "inlet": {
+      "value_milli": 5000,
+      "unit": "psi"
+    },
+    "outlet": {
+      "value_milli": 30000,
+      "unit": "psi"
+    },
+    "run": true,
+    "alarm": true,
+    "expected_state": "LOW_PRESSURE",
+    "expected_consistency": "CONSISTENT"
+  },
+  {
+    "id": "psi-rounding-exact",
+    "inlet": {
+      "value_milli": 44738,
+      "unit": "kPa"
+    },
+    "outlet": {
+      "value_milli": 50000,
+      "unit": "psi"
+    },
+    "run": true,
+    "alarm": false,
+    "expected_state": "NORMAL",
+    "expected_consistency": "CONSISTENT"
+  },
+  {
+    "id": "psi-rounding-below",
+    "inlet": {
+      "value_milli": 44739,
+      "unit": "kPa"
+    },
+    "outlet": {
+      "value_milli": 50000,
+      "unit": "psi"
+    },
+    "run": true,
+    "alarm": true,
+    "expected_state": "LOW_PRESSURE",
+    "expected_consistency": "CONSISTENT"
+  },
+  {
+    "id": "psi-to-bar-normal",
+    "inlet": {
+      "value_milli": 50000,
+      "unit": "psi"
+    },
+    "outlet": {
+      "value_milli": 6500,
+      "unit": "bar"
+    },
+    "run": true,
+    "alarm": false,
+    "expected_state": "NORMAL",
+    "expected_consistency": "CONSISTENT"
+  },
+  {
+    "id": "equivalent-mixed-pressure",
+    "inlet": {
+      "value_milli": 1000,
+      "unit": "bar"
+    },
+    "outlet": {
+      "value_milli": 100000,
+      "unit": "kPa"
+    },
+    "run": true,
+    "alarm": true,
+    "expected_state": "LOW_PRESSURE",
+    "expected_consistency": "CONSISTENT"
+  },
+  {
+    "id": "negative-inlet",
+    "inlet": {
+      "value_milli": -100000,
+      "unit": "kPa"
+    },
+    "outlet": {
+      "value_milli": 200000,
+      "unit": "kPa"
+    },
+    "run": true,
+    "alarm": false,
+    "expected_state": "NORMAL",
+    "expected_consistency": "CONSISTENT"
+  },
+  {
+    "id": "negative-psi-rounding",
+    "inlet": {
+      "value_milli": -1,
+      "unit": "psi"
+    },
+    "outlet": {
+      "value_milli": 299993,
+      "unit": "kPa"
+    },
+    "run": true,
+    "alarm": false,
+    "expected_state": "NORMAL",
+    "expected_consistency": "CONSISTENT"
+  },
+  {
+    "id": "negative-outlet-low",
+    "inlet": {
+      "value_milli": 0,
+      "unit": "bar"
+    },
+    "outlet": {
+      "value_milli": -1000,
+      "unit": "kPa"
+    },
+    "run": true,
+    "alarm": true,
+    "expected_state": "LOW_PRESSURE",
+    "expected_consistency": "CONSISTENT"
+  },
+  {
+    "id": "threshold-with-contradiction",
+    "inlet": {
+      "value_milli": 50000,
+      "unit": "psi"
+    },
+    "outlet": {
+      "value_milli": 644738,
+      "unit": "kPa"
+    },
+    "run": true,
+    "alarm": true,
+    "expected_state": "NORMAL",
+    "expected_consistency": "CONTRADICTION"
+  },
+  {
+    "id": "small-positive-psi-rounding",
+    "inlet": {
+      "value_milli": 0,
+      "unit": "kPa"
+    },
+    "outlet": {
+      "value_milli": 1,
+      "unit": "psi"
+    },
+    "run": true,
+    "alarm": false,
+    "expected_state": "LOW_PRESSURE",
+    "expected_consistency": "CONTRADICTION"
+  }
+]

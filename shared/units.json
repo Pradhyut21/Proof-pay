@@ -1,0 +1,16 @@
+{
+  "pressure": {
+    "kPa": {
+      "numerator": 1,
+      "denominator": 1
+    },
+    "bar": {
+      "numerator": 100,
+      "denominator": 1
+    },
+    "psi": {
+      "numerator": 6894757293168,
+      "denominator": 1000000000000
+    }
+  }
+}

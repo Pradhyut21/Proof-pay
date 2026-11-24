@@ -1,0 +1,18 @@
+schema_version: '1.0.0'
+pilot:
+  base_scenes: 20
+  question_range: [30, 50]
+dataset_targets:
+  answerable: 500
+  skills: {R: 100, C: 80, M: 150, X: 100}
+  counterfactual_pairs: 50
+  missing_evidence: 40
+  judge_samples: 30
+  human_audit_sample: 50
+split:
+  dev_fraction: 0.2
+  group_by: [base_scene, layout_lineage]
+evaluation:
+  required_conditions: [C0, C1, C3]
+  optional_conditions: [C2, C4]
+  live_inference: false
