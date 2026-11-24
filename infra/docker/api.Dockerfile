@@ -4,6 +4,7 @@ WORKDIR /src
 COPY Cargo.toml Cargo.lock ./
 COPY crates crates
 COPY migrations migrations
+COPY shared shared
 RUN cargo build --locked --release -p panelproof-api
 
 FROM debian:bookworm-slim

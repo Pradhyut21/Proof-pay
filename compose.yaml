@@ -4,22 +4,20 @@
 services:
   api:
     build: { context: ., dockerfile: infra/docker/api.Dockerfile }
-    command: ["/data/demo", "/state/demo.sqlite", "0.0.0.0:3001"]
+    command: ["/data/demo", "/tmp/panelproof-demo.sqlite", "127.0.0.1:3001"]
     environment:
       PANELPROOF_REVEAL_TOKEN: ${PANELPROOF_REVEAL_TOKEN:-local-dev-token-0123}
     volumes:
       - ./data/demo:/data/demo:ro
-      - api-state:/state
-    ports: ["127.0.0.1:3001:3001"]
+    # The web process shares this network namespace and listens on port 3000.
+    ports: ["127.0.0.1:3000:3000"]
   web:
     build: { context: ., dockerfile: infra/docker/web.Dockerfile }
+    network_mode: "service:api"
     environment:
-      PP_API_DEMO: http://api:3001
+      PP_API_DEMO: http://127.0.0.1:3001
       PANELPROOF_REVEAL_TOKEN: ${PANELPROOF_REVEAL_TOKEN:-local-dev-token-0123}
       PP_DEMO_DIR: /data/demo
     volumes:
       - ./data/demo:/data/demo:ro
     depends_on: [api]
-    ports: ["127.0.0.1:3000:3000"]
-volumes:
-  api-state: {}

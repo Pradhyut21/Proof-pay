@@ -2,7 +2,7 @@
 """One-command offline smoke test: generate -> verify -> export -> import into the API -> attempt -> report.
 
 Runs with no credentials and no network. A step that needs something unavailable is recorded as "not run" with
-the reason instead of being skipped silently. Writes docs/results/smoke_report.json (exact environment included).
+the reason instead of being skipped silently. Use --report-dir to select where reports are written.
 
     python scripts/smoke.py            # Python + Rust API
     python scripts/smoke.py --web      # also start the built Next.js app and fetch each page
@@ -32,6 +32,12 @@ ROOT = Path(__file__).resolve().parents[1]
 EXE = ".exe" if os.name == "nt" else ""
 RESULTS: list[dict] = []
 TOKEN = "smoke-token-0123456789"
+
+
+def raster_check_passed(summary: dict) -> bool:
+    """The smoke needs at least one recovery, with every recovery agreeing."""
+    verified = summary.get("verified", 0)
+    return verified > 0 and verified == summary.get("agree_with_truth")
 
 
 def step(name: str, status: str, detail: str = "") -> None:
@@ -92,14 +98,17 @@ def api_command(dataset: Path, sqlite: Path, addr: str) -> tuple[list[str], dict
     step("cargo build --locked -p panelproof-api", "pass" if b.returncode == 0 else "fail", (b.stderr or "").strip().splitlines()[-1][:200] if b.returncode else "ok")
     if b.returncode != 0:
         return None
-    return [str(ROOT / "target" / "debug" / f"panelproof-api{EXE}"), str(dataset), str(sqlite), addr], {"PANELPROOF_REVEAL_TOKEN": TOKEN}
+    target = ROOT / os.environ.get("CARGO_TARGET_DIR", "target")
+    return [str(target / "debug" / f"panelproof-api{EXE}"), str(dataset), str(sqlite), addr], {"PANELPROOF_REVEAL_TOKEN": TOKEN}
 
 
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--web", action="store_true")
     ap.add_argument("--keep", action="store_true")
+    ap.add_argument("--report-dir", type=Path, default=ROOT / "docs" / "results")
     args = ap.parse_args()
+    args.report_dir.mkdir(parents=True, exist_ok=True)
     work = Path(tempfile.mkdtemp(prefix="pp-smoke-"))
     py = [sys.executable, "-m", "panelproof.cli"]
     pyenv = {"PYTHONPATH": str(ROOT / "python" / "src")}
@@ -113,8 +122,7 @@ def main() -> int:
         step("generate 4 base scenes; repeated build has the same manifest hash", "pass" if h[0] and h[0] == h[1] else "fail", str(h[0]))
         r = run([*py, "verify", "--dataset", str(work / "gen_a")], env=pyenv)
         summary = json.loads(r.stdout) if r.returncode == 0 else {}
-        bad = summary.get("verified", 0) - summary.get("agree_with_truth", 0)  # accepted but disagreeing with truth
-        step("raster verifier accepts scenes with zero wrong readings", "pass" if r.returncode == 0 and not bad else "fail", json.dumps(summary)[:240])
+        step("raster verifier accepts scenes with zero wrong readings", "pass" if r.returncode == 0 and raster_check_passed(summary) else "fail", json.dumps(summary)[:240])
 
         # 2. export bundle in the shared contract and validate every record against the typed schemas
         fac = work / "bundle"
@@ -122,7 +130,7 @@ def main() -> int:
         ok = r.returncode == 0 and (fac / "public" / "tasks.jsonl").exists() and (fac / "private" / "tasks.jsonl").exists()
         step("export contract bundle (public/tasks.jsonl, private/tasks.jsonl, images/)", "pass" if ok else "fail", (r.stdout or r.stderr).strip()[-160:])
         if not ok:
-            return finish(1, work, args.keep)
+            return finish(1, work, args.keep, args.report_dir)
         check = (
             "import json,sys;from pathlib import Path;from panelproof.schemas import PublicTask,PrivateTask;"
             "b=Path(sys.argv[1]);pub=[PublicTask.model_validate_json(l) for l in (b/'public/tasks.jsonl').read_text().splitlines() if l];"
@@ -143,7 +151,7 @@ def main() -> int:
             procs.append(subprocess.Popen(cmd, cwd=ROOT, env={**os.environ, **extra}, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
             if not wait_for(f"{base}/healthz"):
                 step("API imports the bundle and starts", "fail", "no /healthz within 40s")
-                return finish(1, work, args.keep)
+                return finish(1, work, args.keep, args.report_dir)
             step("API imports the bundle and starts", "pass", call("GET", f"{base}/healthz")[1].decode())
             page = json.loads(call("GET", f"{base}/api/v1/tasks?limit=100")[1])["items"]
             leaked = [t["task_id"] for t in page if set(t) != {"schema_version", "task_id", "image_path", "question", "public_rules", "response_schema"}]
@@ -176,7 +184,8 @@ def main() -> int:
                     env = {**os.environ, "PP_API_DEMO": base, "PANELPROOF_REVEAL_TOKEN": TOKEN, "PP_DEMO_DIR": str(fac)}
                     procs.append(subprocess.Popen([pnpm, "exec", "next", "start", "-H", "127.0.0.1", "-p", str(wport)], cwd=web, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
                     up = wait_for(f"http://127.0.0.1:{wport}/", 60)
-                    codes = {p: code_of("GET", f"http://127.0.0.1:{wport}{p}") for p in ("/", "/factory", "/arena", "/api/pp/demo/healthz", "/api/extras/demo/pairs")}
+                    urls = ("/", "/factory", "/arena", "/api/pp/demo/healthz", "/api/extras/demo/pairs")
+                    codes = {p: code_of("GET", f"http://127.0.0.1:{wport}{p}") for p in urls} if up else {}
                     step("web pages and same-origin proxy respond", "pass" if up and all(v == 200 for v in codes.values()) else "fail", json.dumps(codes))
             else:
                 step("web pages", "not run", "pass --web (needs `pnpm build`)")
@@ -197,8 +206,8 @@ def main() -> int:
             labelled = md.exists() and "DEMO ONLY" in md.read_text(encoding="utf-8")
             step("report generated and labelled DEMO ONLY", "pass" if r.returncode == 0 and r2.returncode == 0 and labelled else "fail", (r2.stderr or "").strip()[-160:])
             if md.exists():
-                shutil.copyfile(md, ROOT / "docs" / "results" / "smoke_report_demo.md")
-        return finish(0, work, args.keep)
+                shutil.copyfile(md, args.report_dir / "smoke_report_demo.md")
+        return finish(0, work, args.keep, args.report_dir)
     finally:
         for p in procs:
             p.terminate()
@@ -209,10 +218,9 @@ def main() -> int:
                 p.kill()
 
 
-def finish(code: int, work: Path, keep: bool) -> int:
+def finish(code: int, work: Path, keep: bool, report_dir: Path) -> int:
     failed = [r for r in RESULTS if r["status"] == "fail"]
-    out = ROOT / "docs" / "results" / "smoke_report.json"
-    out.parent.mkdir(parents=True, exist_ok=True)
+    out = report_dir / "smoke_report.json"
     counts = {s: sum(1 for r in RESULTS if r["status"] == s) for s in ("pass", "fail", "not run")}
     payload = {
         "environment": {"python": sys.version.split()[0], "platform": platform.platform(), "machine": platform.machine(),
@@ -221,7 +229,7 @@ def finish(code: int, work: Path, keep: bool) -> int:
         "steps": RESULTS,
     }
     out.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-    print(f"\nsmoke: {counts}; report -> {out.relative_to(ROOT)}")
+    print(f"\nsmoke: {counts}; report -> {out}")
     if not keep:
         shutil.rmtree(work, ignore_errors=True)
     return 1 if failed else code
