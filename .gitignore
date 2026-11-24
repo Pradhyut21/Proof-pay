@@ -1,0 +1,22 @@
+# build / local state
+target/
+node_modules/
+.next/
+out/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.venv/
+*.egg-info/
+# generated datasets, local databases, run artifacts, credentials
+data/build/
+data/private/
+data/runs/
+*.sqlite
+*.sqlite3
+*.db
+.env
+.env.local
+playwright-report/
+test-results/
