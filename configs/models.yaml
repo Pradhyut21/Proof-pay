@@ -1,0 +1,15 @@
+# Eval defaults to the built-in `demo` adapter even when a registry exists.
+# Replace model_id and, if known, pin revision before a live evaluation.
+models:
+  openai-example:
+    provider: openai_compatible
+    endpoint: https://api.openai.com/v1/chat/completions
+    model_id: REPLACE_WITH_A_VISION_MODEL_ID
+    revision: null
+    api_key_env: OPENAI_API_KEY
+  anthropic-example:
+    provider: anthropic
+    endpoint: https://api.anthropic.com/v1/messages
+    model_id: REPLACE_WITH_A_VISION_MODEL_ID
+    revision: null
+    api_key_env: ANTHROPIC_API_KEY
