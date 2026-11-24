@@ -1,0 +1,20 @@
+[package]
+name = "panelproof-api"
+edition.workspace = true
+version.workspace = true
+
+[dependencies]
+anyhow = "1"
+axum = "0.8"
+panelproof-scoring = { path = "../scoring" }
+png = "0.18"
+serde.workspace = true
+serde_json.workspace = true
+sha2 = "0.10"
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "sqlite"] }
+subtle = "2.6"
+tokio = { version = "1", features = ["macros", "net", "rt-multi-thread", "signal"] }
+
+[dev-dependencies]
+tempfile = "3"
+tower = { version = "0.5", features = ["util"] }
