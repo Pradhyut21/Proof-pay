@@ -27,7 +27,14 @@ import cv2
 import numpy as np
 import yaml
 
-from .mutations import Variant, make_missing, make_nuisance, make_preserving, make_semantic_flip
+from .mutations import (
+    Variant,
+    make_inlet_floor_flip,
+    make_missing,
+    make_nuisance,
+    make_preserving,
+    make_semantic_flip,
+)
 from .question_bridge import (
     Question,
     answer_from_trace,
@@ -302,9 +309,11 @@ def _generate_dataset(
         if idx % var_cfg["preserving_every"] == 1:
             makers.append(make_preserving)
         makers.append(make_missing)
+        if cfg.get("include_inlet_floor"):
+            makers.append(make_inlet_floor_flip)
         for fn in makers:
             v = None
-            for _try in range(6):
+            for _try in range(1 if fn is make_inlet_floor_flip else 6):
                 v = fn(g["scene"], rng, tag=f"{fn.__name__}{_try}")
                 if v:
                     break
@@ -758,7 +767,7 @@ def _select_tasks(
         return next(
             (
                 q
-                for q in build_questions(scene)
+                for q in build_questions(scene, include_inlet_floor=kind == "inlet_state")
                 if q.kind == kind and q.pump_id == pump and (role is None or q.role == role)
             ),
             None,
@@ -792,6 +801,10 @@ def _select_tasks(
             "nuisance": [("state", None), ("consistency", None)],
             "preserving": [("state", None), ("delta", None)],
         }[var.kind]
+        if var.edit == "inlet_floor_cross":
+            kinds = [("inlet_state", None)]
+        elif cfg.get("include_inlet_floor"):
+            kinds.append(("inlet_state", None))
         pump = var.pump_id or base.pumps[0].pump_id
         for kind, role in kinds:
             before = pick(base, kind, pump, role)
@@ -827,6 +840,11 @@ def _select_tasks(
             roles = ["OUTLET"] if kind == "convert" else ["INLET", "OUTLET"] if kind == "read" else [None]
             role = roles[int(hid(a["group_id"], p.pump_id, kind, n=4), 16) % len(roles)]
             q = pick(a["scene"], kind, p.pump_id, role)
+            if q:
+                add(_task(a, a["scene"], a["res"], q, split_of[a["group_id"]], variant_kind="base"))
+    if cfg.get("include_inlet_floor"):
+        for a, p in pool:
+            q = pick(a["scene"], "inlet_state", p.pump_id)
             if q:
                 add(_task(a, a["scene"], a["res"], q, split_of[a["group_id"]], variant_kind="base"))
     for t in out:
@@ -1115,7 +1133,7 @@ def audit_dataset(
         for s in ("dev", "frozen")
     }
     findings["seed_overlap_dev_frozen"] = len(seeds_by_split["dev"] & seeds_by_split["frozen"])
-    # layout family overlap is reported, not a leak by itself: only two families exist
+    # Layout family overlap is reported separately from group and image leakage.
     fam = {
         s: {p["layout_family"] for p in priv if ("dev" if p["split"] == "dev" else "frozen") == s}
         for s in ("dev", "frozen")
@@ -1160,6 +1178,18 @@ def audit_dataset(
         )
     findings["question_pairs_checked"] = len(pairs)
     findings["invalid_question_pairs"] = bad_pairs
+    inlet_rows = [row for row in priv if row["set"] == "main" and row["kind"] == "inlet_state"]
+    if inlet_rows:
+        findings["inlet_rule_coverage"] = {
+            "tasks_by_split": dict(sorted(Counter(row["split"] for row in inlet_rows).items())),
+            "tasks_by_layout": dict(sorted(Counter(row["layout_family"] for row in inlet_rows).items())),
+            "pairs_by_variant": dict(sorted(Counter(
+                variant["variant_kind"]
+                for members in pairs.values()
+                for variant in members
+                if variant["kind"] == "inlet_state" and variant["variant_kind"] != "base"
+            ).items())),
+        }
     # hash drift: manifest recomputation + optional repeated pinned build
     man = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
     claimed = man.pop("manifest_sha256", None)
@@ -1192,7 +1222,7 @@ def audit_dataset(
             findings["rebuild_manifest_equal"] = rep["manifest_sha256"] == claimed
     # cue association: visible ALARM state vs the answer class, by question kind
     cue: dict[str, Any] = {}
-    for kind in ("state", "consistency"):
+    for kind in ("state", "consistency", *(("inlet_state",) if inlet_rows else ())):
         rows = [p for p in priv if p["kind"] == kind and p["set"] == "main"]
         classes = sorted({p["answer"]["value"] for p in rows})
         on = [p for p in rows if p["alarm_on"]]

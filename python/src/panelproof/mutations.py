@@ -13,6 +13,7 @@ from typing import Any
 
 from .render import THEMES
 from .rule_bridge import THRESHOLD_MKPA, pump_state
+from .rules import INLET_FLOOR_RULE
 from .scene import Gauge, Scene, load_config, place_glare, scene_from_dict
 from .units import to_milli_kpa
 
@@ -108,6 +109,40 @@ def make_semantic_flip(base: Scene, rng: random.Random, tag: str = "sem") -> Var
         "semantic", edit, p.pump_id, s, scene_diff(base, s), {"before": before, "after": after, "direction": direction}
     )
     return v if not validate_variant(base, v) else None
+
+
+def make_inlet_floor_flip(base: Scene, rng: random.Random, tag: str = "inlet") -> Variant | None:
+    """Cross the inlet threshold with a single needle while retaining the delta-rule answer."""
+    candidates = []
+    for pump in base.pumps:
+        inlet, outlet = pump.gauge("INLET"), pump.gauge("OUTLET")
+        if not pump.run:
+            continue
+        before = INLET_FLOOR_RULE.state_for_interval(True, inlet.value_mkpa, inlet.minor_mkpa)
+        if before is None:
+            continue
+        for tick in range(1, inlet.n_minor):
+            display = inlet.min_milli + tick * inlet.minor_milli
+            reading = to_milli_kpa(display, inlet.unit)
+            after = INLET_FLOOR_RULE.state_for_interval(True, reading, inlet.minor_mkpa)
+            delta = outlet.value_mkpa - reading
+            if (
+                after is not None and after != before
+                and delta >= 0
+                and abs(delta - THRESHOLD_MKPA) >= inlet.minor_mkpa + outlet.minor_mkpa
+                and pump_state(True, reading, outlet.value_mkpa) == pump.state()
+            ):
+                candidates.append((pump.pump_id, display, before, after))
+    if not candidates:
+        return None
+    pump_id, display, before, after = rng.choice(candidates)
+    scene = _clone(base, tag)
+    scene.pump(pump_id).gauge("INLET").value_milli = display
+    variant = Variant(
+        "semantic", "inlet_floor_cross", pump_id, scene, scene_diff(base, scene),
+        {"before": {"inlet_state": before}, "after": {"inlet_state": after}},
+    )
+    return variant if not validate_variant(base, variant) else None
 
 
 def make_preserving(base: Scene, rng: random.Random, tag: str = "unit") -> Variant | None:
@@ -244,7 +279,21 @@ def validate_variant(base: Scene, v: Variant) -> list[str]:
         changed = [k for k in sb if sb[k] != sv[k]]
         if changed != [v.pump_id]:
             errs.append(f"semantic edit touched pumps {changed}")
-        if (
+        if v.edit == "inlet_floor_cross":
+            before, after = base.pump(v.pump_id), v.scene.pump(v.pump_id)
+            reads = [
+                INLET_FLOOR_RULE.state_for_interval(
+                    p.run, p.gauge("INLET").value_mkpa, p.gauge("INLET").minor_mkpa
+                ) for p in (before, after)
+            ]
+            if (
+                not before.run or not after.run or before.state() != after.state()
+                or None in reads or reads[0] == reads[1]
+                or len(v.diff) != 1 or not v.diff[0]["path"].endswith(".value_milli")
+                or before.gauge("INLET").value_milli == after.gauge("INLET").value_milli
+            ):
+                errs.append("inlet-floor edit must change only the inlet-rule answer")
+        elif (
             sb[v.pump_id]["state"] == sv[v.pump_id]["state"]
             and sb[v.pump_id]["consistent"] == sv[v.pump_id]["consistent"]
         ):

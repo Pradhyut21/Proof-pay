@@ -11,7 +11,8 @@ import hashlib
 from dataclasses import asdict, dataclass
 from typing import Any
 
-from .questions import _category_schema, build_question
+from .questions import AmbiguousQuestion, _category_schema, build_question
+from .rules import INLET_FLOOR_RULE
 from .scene import Scene
 from .schemas import SCHEMA_VERSION, Pressure, Pump
 from .schemas import Scene as ContractScene
@@ -24,7 +25,7 @@ STATES = ["STOPPED", "NORMAL", "LOW_PRESSURE"]
 @dataclass
 class Question:
     skill: str  # R | C | M | X
-    kind: str  # read | convert | state | delta | consistency
+    kind: str  # read | convert | state | inlet_state | delta | consistency
     pump_id: str
     role: str | None
     target_unit: str | None
@@ -69,7 +70,14 @@ def contract_scene(scene: Scene) -> ContractScene:
     )
 
 
-def _draft(scene: ContractScene, pump_id: str, kind: str, target_unit: str | None = None):
+def _draft(
+    scene: ContractScene,
+    pump_id: str,
+    kind: str,
+    target_unit: str | None = None,
+    *,
+    uncertainty_milli_kpa: int = 0,
+):
     # task_id/image_path are placeholders: the exporter assigns the real identifiers.
     return build_question(
         scene,
@@ -77,6 +85,7 @@ def _draft(scene: ContractScene, pump_id: str, kind: str, target_unit: str | Non
         kind,  # type: ignore[arg-type]
         task_id="placeholder",
         image_path="images/placeholder.png",
+        uncertainty_milli_kpa=uncertainty_milli_kpa,
         **({"target_unit": target_unit} if target_unit else {}),
     )
 
@@ -85,7 +94,7 @@ def _numeric_answer(draft, tol_milli: int) -> dict[str, Any]:
     return numeric(draft.answer.value_milli, draft.answer.unit, tol_milli)
 
 
-def build_questions(scene: Scene) -> list[Question]:
+def build_questions(scene: Scene, *, include_inlet_floor: bool = False) -> list[Question]:
     """Questions come from the shared contract builder (``questions.build_question``)."""
     cs = contract_scene(scene)
     out: list[Question] = []
@@ -148,6 +157,27 @@ def build_questions(scene: Scene) -> list[Question]:
                 d.public.public_rules, d.public.response_schema, "indicator_consistency",
             )
         )
+        if include_inlet_floor:
+            try:
+                d = _draft(
+                    cs, p.pump_id, "inlet_state", uncertainty_milli_kpa=gi.minor_mkpa
+                )
+            except AmbiguousQuestion:
+                continue
+            out.append(
+                Question(
+                    "M",
+                    "inlet_state",
+                    p.pump_id,
+                    "INLET",
+                    None,
+                    d.public.question,
+                    category(d.answer.value),
+                    d.public.public_rules,
+                    d.public.response_schema,
+                    "operational_state",
+                )
+            )
     return out
 
 
@@ -178,6 +208,22 @@ def score_answer(answer: dict[str, Any], response: dict[str, Any] | None) -> str
 
 def answer_from_trace(q: Question, trace_pump: dict[str, Any]) -> dict[str, Any] | None:
     """Derive the answer to `q` from an independent raster-verifier pump trace."""
+    if q.kind == "inlet_state":
+        run = trace_pump.get("run")
+        if trace_pump.get("verdict") != "verified" or type(run) is not bool:
+            return None
+        if not run:
+            return category(INLET_FLOOR_RULE.state_for(False, 0))
+        gauges = trace_pump.get("gauges")
+        inlet = gauges.get("INLET") if isinstance(gauges, dict) else None
+        if not isinstance(inlet, dict):
+            return None
+        reading = inlet.get("reading_mkpa")
+        uncertainty = inlet.get("uncertainty_mkpa")
+        if type(reading) is not int or type(uncertainty) is not int or uncertainty < 0:
+            return None
+        state = INLET_FLOOR_RULE.state_for_interval(run, reading, uncertainty)
+        return category(state) if state is not None else None
     if q.kind == "read":
         g = trace_pump["gauges"][q.role]
         return numeric(g["reading_milli"], g["unit"], g["minor_tick_milli"])

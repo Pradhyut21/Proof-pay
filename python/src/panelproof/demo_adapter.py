@@ -17,6 +17,7 @@ from typing import Any
 
 from .question_bridge import UNIT_ORDER
 from .rule_bridge import pump_state
+from .rules import INLET_FLOOR_RULE
 from .units import convert_milli, from_milli_kpa, to_milli_kpa
 
 MODEL = "demo-offline-mock"
@@ -59,13 +60,15 @@ def _answer(
         return {"kind": "numeric", "value_milli": from_milli_kpa(mk["OUTLET"] - mk["INLET"], "kPa"), "unit": "kPa"}
     if k == "state":
         return {"kind": "category", "value": state}
+    if k == "inlet_state":
+        return {"kind": "category", "value": INLET_FLOOR_RULE.state_for(run, mk["INLET"])}
     exp = state == "LOW_PRESSURE"
     return {"kind": "category", "value": "CONSISTENT" if rd["alarm"] == exp else "CONTRADICTION"}
 
 
 def _prior(task: dict[str, Any], rng: random.Random) -> dict[str, Any]:
     k = task["kind"]
-    if k == "state":
+    if k in {"state", "inlet_state"}:
         return {"kind": "category", "value": rng.choice(["STOPPED", "NORMAL", "LOW_PRESSURE"])}
     if k == "consistency":
         return {"kind": "category", "value": rng.choice(["CONSISTENT", "CONTRADICTION"])}

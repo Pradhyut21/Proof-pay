@@ -6,7 +6,9 @@ import shutil
 import subprocess
 from collections.abc import Iterable, Mapping
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
+
+VerifierRule = Literal["delta", "inlet-floor"]
 
 
 class RustVerificationError(RuntimeError):
@@ -19,6 +21,7 @@ def verify_scenes(
     executable: str | os.PathLike[str] = "pp",
     required: bool = False,
     timeout_seconds: float = 30,
+    rule: VerifierRule = "delta",
 ) -> list[dict[str, Any]] | None:
     """Return verified rows, or None if an optional Rust binary is absent."""
     binary = shutil.which(os.fspath(executable))
@@ -31,9 +34,12 @@ def verify_scenes(
     if not records:
         return []
     payload = "".join(json.dumps(dict(scene), allow_nan=False) + "\n" for scene in records)
+    command = [os.fspath(Path(binary).resolve()), "verify", "--scenes", "-"]
+    if rule != "delta":
+        command.extend(["--rule", rule])
     try:
         process = subprocess.run(
-            [os.fspath(Path(binary).resolve()), "verify", "--scenes", "-"],
+            command,
             input=payload,
             capture_output=True,
             encoding="utf-8",

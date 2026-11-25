@@ -7,6 +7,7 @@ use thiserror::Error;
 pub const SCHEMA_VERSION: &str = "1.0.0";
 pub const MAX_SAFE_INTEGER: i64 = 9_007_199_254_740_991;
 pub const NORMAL_DELTA_MILLI_KPA: i64 = 300_000;
+pub const NORMAL_INLET_MILLI_KPA: i64 = 150_000;
 
 const UNITS_JSON: &str = include_str!("../../../shared/units.json");
 
@@ -55,6 +56,12 @@ pub enum PumpState {
     Stopped,
     Normal,
     LowPressure,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum PumpRule {
+    Delta,
+    InletFloor,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -142,12 +149,23 @@ pub fn convert_to_milli_kpa(pressure: Pressure) -> Result<i64, OracleError> {
 }
 
 pub fn verify_equipment(equipment: &Equipment) -> Result<PumpVerification, OracleError> {
+    verify_equipment_with_rule(equipment, PumpRule::Delta)
+}
+
+pub fn verify_equipment_with_rule(
+    equipment: &Equipment,
+    rule: PumpRule,
+) -> Result<PumpVerification, OracleError> {
     let inlet = convert_to_milli_kpa(equipment.inlet)?;
     let outlet = convert_to_milli_kpa(equipment.outlet)?;
     let delta = outlet
         .checked_sub(inlet)
         .ok_or(OracleError::ConversionOverflow)?;
-    let state = match (equipment.run, delta >= NORMAL_DELTA_MILLI_KPA) {
+    let meets_threshold = match rule {
+        PumpRule::Delta => delta >= NORMAL_DELTA_MILLI_KPA,
+        PumpRule::InletFloor => inlet >= NORMAL_INLET_MILLI_KPA,
+    };
+    let state = match (equipment.run, meets_threshold) {
         (false, _) => PumpState::Stopped,
         (true, true) => PumpState::Normal,
         (true, false) => PumpState::LowPressure,
@@ -168,6 +186,13 @@ pub fn verify_equipment(equipment: &Equipment) -> Result<PumpVerification, Oracl
 }
 
 pub fn verify_scene(scene: &Scene) -> Result<SceneVerification, OracleError> {
+    verify_scene_with_rule(scene, PumpRule::Delta)
+}
+
+pub fn verify_scene_with_rule(
+    scene: &Scene,
+    rule: PumpRule,
+) -> Result<SceneVerification, OracleError> {
     if scene.schema_version != SCHEMA_VERSION {
         return Err(OracleError::SchemaVersion(scene.schema_version.clone()));
     }
@@ -206,7 +231,7 @@ pub fn verify_scene(scene: &Scene) -> Result<SceneVerification, OracleError> {
     let equipment = scene
         .equipment
         .iter()
-        .map(verify_equipment)
+        .map(|pump| verify_equipment_with_rule(pump, rule))
         .collect::<Result<_, _>>()?;
     Ok(SceneVerification {
         base_scene_id: scene.base_scene_id.clone(),

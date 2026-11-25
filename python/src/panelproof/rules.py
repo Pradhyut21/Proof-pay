@@ -103,3 +103,46 @@ class PumpRule:
 
 
 PUMP_RULE = PumpRule()
+
+
+@dataclass(frozen=True)
+class InletFloorRule:
+    threshold_milli_kpa: int = 150_000
+
+    @property
+    def public_text(self) -> str:
+        threshold = format(Decimal(self.threshold_milli_kpa) / 1000, "f")
+        return (
+            "For the named pump, RUN off means STOPPED. With RUN on, convert the inlet "
+            f"reading to kPa. {conversion_rules_text()} Round it to the nearest 0.001 kPa "
+            f"with ties away from zero. If the inlet reading is at least {threshold} kPa, "
+            "the state is NORMAL. Otherwise it is LOW_PRESSURE. ALARM is expected to be "
+            "on only for LOW_PRESSURE."
+        )
+
+    def state_for(self, run: bool, inlet_milli_kpa: int) -> PumpState:
+        if not run:
+            return "STOPPED"
+        return "NORMAL" if inlet_milli_kpa >= self.threshold_milli_kpa else "LOW_PRESSURE"
+
+    def state_for_interval(
+        self, run: bool, inlet_milli_kpa: int, uncertainty_milli_kpa: int
+    ) -> PumpState | None:
+        """Return a state only when the full recovered reading interval agrees."""
+        if uncertainty_milli_kpa < 0:
+            raise ValueError("uncertainty must be nonnegative")
+        lower = self.state_for(run, inlet_milli_kpa - uncertainty_milli_kpa)
+        upper = self.state_for(run, inlet_milli_kpa + uncertainty_milli_kpa)
+        return lower if lower == upper else None
+
+    def solve(self, pump: Pump) -> PumpResult:
+        inlet = convert_pressure(pump.inlet, "kPa")
+        outlet = convert_pressure(pump.outlet, "kPa")
+        state = self.state_for(pump.run, inlet)
+        consistency: AlarmConsistency = (
+            "CONSISTENT" if pump.alarm == (state == "LOW_PRESSURE") else "CONTRADICTION"
+        )
+        return PumpResult(inlet, outlet, outlet - inlet, state, consistency)
+
+
+INLET_FLOOR_RULE = InletFloorRule()
