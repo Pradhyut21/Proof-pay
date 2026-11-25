@@ -74,6 +74,8 @@ uv run --project python --python 3.11 --locked python -m panelproof.cli audit-da
 
 Use absolute paths appropriate to your platform. The v0.4 configuration includes all three layouts and both operating-state rules. The builder without a holdout seed file creates a public reproducibility build. Prepare and pin the new cohort with the [measured evaluation procedure](../evals/conditions.md#measured-runs-need-a-freeze). The v0.2 configuration remains available at `configs/benchmark.yaml`.
 
+The recorded private v0.4 rebuild matched the original manifest on Windows x64 with Python 3.11.15, Pillow 12.3.0 (PNG zlib codec `1.3.1.zlib-ng`), and OpenCV 5.1.0. Both runs used the same configuration and private seed.
+
 ## Build the expanded layout dataset
 
 The expanded generator adds a side-by-side two-pump layout with stacked gauges. The commands below produce and audit the public v0.3 configuration. The prior `configs/benchmark.yaml` remains available for reproducing v0.2.

@@ -12,7 +12,7 @@
 | X (consistency) | Whether the ALARM lamp agrees with the rules | `CONSISTENT`, `CONTRADICTION` |
 | Diagnostic | Evidence removed from the panel | `INSUFFICIENT` (abstain) |
 
-**Variants.** Semantic flips change the correct answer. An inlet-floor semantic pair moves only the inlet needle and preserves the pressure-difference classification. Preserving edits (a unit change) keep the answer. Nuisance edits (theme, position) keep it. Missing-evidence edits remove what is needed.
+**Variants.** Semantic flips change the correct answer. The targeted inlet-floor crossing moves only the inlet needle and preserves the pressure-difference classification. Preserving edits (a unit change) keep the answer. Nuisance edits (theme, position) keep it. Missing-evidence edits remove what is needed.
 
 **Answer format.** Each public task includes a JSON-Schema `response_schema`. Numeric answers are integer milli-units; scoring compares them within the private tolerance.
 

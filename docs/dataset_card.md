@@ -40,7 +40,7 @@ The v0.3 balanced X counts were 12 Dev (3 per cell), 80 frozen main, and 72 froz
 
 ## Current private holdout
 
-The [v0.4 configuration](../configs/benchmark-dual-rule.yaml) uses all three layouts and adds operating-state tasks based on an inlet-pressure floor. A targeted semantic pair crosses the inlet threshold while preserving the pressure-difference classification. The audit recorded **1,002** answerable tasks, **803** of them frozen, and **40** separate diagnostics. It checked **437** valid pairs. The new rule accounts for **300** tasks and **91** semantic pairs across all three layouts, including **102** inlet tasks in the column layout.
+The [v0.4 configuration](../configs/benchmark-dual-rule.yaml) uses all three layouts and adds operating-state tasks based on an inlet-pressure floor. The audit recorded **1,002** answerable tasks, **803** of them frozen, and **40** separate diagnostics. It checked **437** valid pairs. The new rule accounts for **300** tasks and **91** semantic pairs across all three layouts, including **102** inlet tasks in the column layout. Of those semantic pairs, **57** are targeted inlet-only crossings that preserve the pressure-difference classification.
 
 | Split | Answerable | Inlet-floor tasks | Available X | Balanced X |
 | --- | ---: | ---: | ---: | ---: |
