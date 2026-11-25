@@ -86,6 +86,23 @@ def test_valid_only_vs_all_attempt_denominators():
     assert rep["banner"].startswith("DEMO ONLY")
 
 
+def test_report_separates_operating_rules_and_counts_skill_groups():
+    tasks = {
+        "d0": task("d0"),
+        "i0": task("i0", kind="inlet_state", answer=cat("LOW_PRESSURE")),
+        "x0": task("x0", kind="consistency", answer=cat("CONSISTENT"), skill="X", group="g2"),
+        "x1": task("x1", kind="consistency", answer=cat("CONSISTENT"), skill="X", group="g3"),
+    }
+    attempts = [
+        att("d0", "C1", cat("NORMAL")), att("i0", "C1", cat("NORMAL")),
+        att("x0", "C1", cat("CONSISTENT")), att("x1", "C1", cat("CONTRADICTION")),
+    ]
+    stats = build_report(tasks, attempts, conditions=("C1",))["models"]["m"]["conditions"]["C1"]
+    assert stats["by_operating_rule"]["delta"]["all_attempt_accuracy"] == 1
+    assert stats["by_operating_rule"]["inlet_floor"]["all_attempt_accuracy"] == 0
+    assert stats["by_skill"]["X"]["ci_all_attempt_accuracy"]["n_groups"] == 2
+
+
 def test_pair_metrics_sensitivity_invariance_and_all_variants_correct():
     tasks = {
         "s0": task("s0", pair="p1", vk="base", group="g1"),

@@ -32,7 +32,7 @@ The reporting gate validates artifacts after inference. Obtain authorization and
 ## Reported quantities
 
 - Attempted, completed, valid and correct counts, with both valid-only and all-attempt accuracy. Failures are typed (`parse_error`, `provider_error`, `timeout`).
-- Accuracy by skill (R, C, M, X) and difficulty (easy, medium, hard).
+- Accuracy by skill (R, C, M, X) and difficulty (easy, medium, hard). Skill reports include group-bootstrap intervals and group counts. For dual-rule datasets, operating-state reports also separate the pressure-difference and inlet-floor rules.
 - Pair metrics: semantic directional sensitivity, nuisance invariance, preserving both-correct.
 - Worst-group accuracy and all-variants-correct.
 - 95% intervals by cluster bootstrap over groups (1000 resamples, fixed seed), so siblings are resampled together.
