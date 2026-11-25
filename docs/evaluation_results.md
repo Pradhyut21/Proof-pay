@@ -9,15 +9,15 @@ The same 50 development tasks passed preflight under C0, C1, and C3. The sample 
 | Evidence | What it covers | Status |
 | --- | --- | --- |
 | Clean raster pilot | Independent recovery compared with generator truth | 19 of 20 scenes recovered, exact agreement on all 19 recoveries. [Pilot report](results/integration_pilot.md) |
-| Rule implementation | Independent Python and Rust readings conversion and rule outcomes | 1,000 seeded scenes, 1,500 pumps, zero mismatches. [Validation](validation.md#4-cross-implementation-parity) |
-| Holdout audit | Group and seed isolation, pair validity, and the marginal ALARM cue | 696 answerable tasks, 282 valid question pairs, zero cross-split groups, images or seeds. [Dataset card](dataset_card.md#current-private-holdout) |
+| Rule implementation | Independent Python and Rust conversion and operating-state outcomes | 1,000 seeded scenes and 1,500 pump cases in each rule mode, zero mismatches. [Validation](validation.md#4-cross-implementation-parity) |
+| Holdout audit | Group and seed isolation, pair validity, and the marginal ALARM cue | v0.4 has 1,002 answerable tasks and 437 valid pairs. The balanced measured scope contains 758 frozen tasks. [Dataset card](dataset_card.md#current-private-holdout) |
 | Browser report | 71 matched tasks across 8 groups and 213 fixture attempt rows | Local scoring and report export verified. **DEMO ONLY**. [Browser and CI checks](https://github.com/Pradhyut21/Proof-pay/pull/25) |
 | Human answerability | Two independent reviews of a prepared 50-task sample | 0 of 50 judged. [Review procedure](human_audit.md) |
 | Live model findings | Matched model runs and case analysis | Awaiting organizer model access and approved usage. [Evaluation issue](https://github.com/Pradhyut21/Proof-pay/issues/18) |
 
 ## Scope
 
-- The existing measured holdout covers two layouts and four themes under one pressure-rule family. The public v0.3 configuration adds a third layout. The held-out theme tests style changes. [Dataset card](dataset_card.md)
+- The v0.4 measured holdout covers three layouts and two operating-state rules. The held-out theme tests style changes. [Dataset card](dataset_card.md)
 - Production verification targets clean renders. A separate 100-scene study found improved exact recovery for small rotations and mild noise in the opt-in mode. [Recovery study](validation.md#opt-in-small-distortion-study)
 - The balanced X slice controls the marginal ALARM shortcut. The full held-out dataset remains available for analysis with its separate shortcut audit.
 - Model error analysis requires actual outputs. For an approved run, record matched sample counts, accuracies with both denominators, failures and uncertainty, and inspectable cases tied to the question, image, and reference. [Frozen protocol](../evals/protocol.md) · [Submission checklist](../submission/DELIVERABLE.md)

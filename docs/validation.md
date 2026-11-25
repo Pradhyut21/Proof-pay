@@ -26,6 +26,8 @@ The [historical v0.1.0 dataset audit](results/dataset_audit.json) passed these c
 | Rebuild from config reproduces the manifest | equal (`manifest_sha256` `a6d884a6…8d00`) |
 | Layout families on both dev and frozen sides | `1p-single`, `2p-rows` |
 
+The rebuild result applies to the recorded build environment. The audit compares encoded file bytes. The verifier decodes PNGs to read the panel and records the encoded SHA-256 in its trace. Identical decoded pixels can therefore coexist with a byte mismatch across environments. [Compare both checks](reproducibility.md#artifact-hashes-and-decoded-pixels)
+
 **Answer-class shortcut check.** Answer distributions by ALARM lamp state:
 
 - State tasks (n=291) had a maximum shift of 1.3 percentage points.
@@ -77,6 +79,8 @@ uv run --project python --python 3.11 --locked python -m panelproof.cli perturb 
 
 ## 4. Cross-implementation parity
 
+The current `pp verify` supports both `delta` and `inlet-floor`. Python and Rust agreed on all 1,500 pump cases across 1,000 seeded scenes per rule, including the exact inlet threshold and mixed-unit boundary cases. To repeat the inlet check, build `pp` and run `uv run --project python --python 3.11 --locked python scripts/check_solver_parity.py --rule inlet-floor`. [Parity runner](../scripts/check_solver_parity.py)
+
 | Check | Result | Where run |
 | --- | --- | --- |
 | `scripts/check_solver_parity.py` (Python rules vs Rust `pp`) | 1000 scenes, 1500 pumps, 0 mismatches (seed 4628501) | Linux (WSL Ubuntu 22.04) |
@@ -91,4 +95,8 @@ uv run --project python --python 3.11 --locked python -m panelproof.cli perturb 
 
 ## Scope of the evidence
 
-Raster agreement compares the generator and verifier within this repository. Human judgments and authorized live model results remain pending. Later platform checks cover Compose build and startup, macOS core tests, and the Windows browser walkthrough. [Current evidence status](evaluation_results.md) · [Platform checks](https://github.com/Pradhyut21/Proof-pay/actions/runs/45449232901)
+Raster agreement covers clean synthetic renders from this generator. The opt-in recovery study covers the listed distortions on its separate 100-scene cohort. The expanded public build establishes coverage of a third layout. Estimating a performance gap between development and frozen splits still requires matched model runs. [Current evidence status](evaluation_results.md)
+
+The development preflight covers 50 tasks from 21 groups and checks planned input coverage. For later measured comparisons, report each cohort's task and group counts alongside group-based intervals. Subgroups with few independent groups have more uncertain estimates. Human judgments and authorized live model results remain pending. [Preflight and evaluation protocol](evaluation_results.md) · [Evaluation conditions](../evals/conditions.md)
+
+Later platform checks cover Compose build and startup, macOS core tests, and the Windows browser walkthrough. [Platform checks](https://github.com/Pradhyut21/Proof-pay/actions/runs/45449232901)

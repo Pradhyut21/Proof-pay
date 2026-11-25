@@ -43,4 +43,4 @@ configs/*.yaml ──► Python factory ──► dataset bundle ──► Rust 
 
 - The API has no job routes, so the Task Factory runner lives in the web layer.
 - The factory writes model attempts in its own fixture format that `metrics --attempt-format` converts; the shared run format is `python -m panelproof.evaluate`.
-- The v0.2 holdout covers two layout families. The expanded v0.3 reproducibility build adds side-by-side pumps with stacked dials. The evaluation covers one pressure-rule family and clean synthetic renders.
+- The v0.4 holdout covers three layout families, two operating-state rules, and clean synthetic renders. The evaluation rules use either pressure difference or the inlet floor.
