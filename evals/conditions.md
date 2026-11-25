@@ -32,7 +32,7 @@ The reporting gate validates artifacts after inference. Obtain authorization and
 ## Reported quantities
 
 - Attempted, completed, valid and correct counts, with both valid-only and all-attempt accuracy. Failures are typed (`parse_error`, `provider_error`, `timeout`).
-- Accuracy by skill (R, C, M, X) and difficulty (easy, medium, hard). Skill reports include group-bootstrap intervals and group counts. For dual-rule datasets, operating-state reports also separate the pressure-difference and inlet-floor rules.
+- Accuracy by skill (R, C, M, X) and difficulty (easy, medium, hard). The CLI JSON and Markdown reports include group-bootstrap intervals and group counts by skill. For dual-rule datasets, those files separate the pressure-difference and inlet-floor operating-state tasks.
 - Pair metrics: semantic directional sensitivity, nuisance invariance, preserving both-correct.
 - Worst-group accuracy and all-variants-correct.
 - 95% intervals by cluster bootstrap over groups (1000 resamples, fixed seed), so siblings are resampled together.
@@ -45,4 +45,4 @@ Mock outputs from the offline adapter are labelled **DEMO ONLY** in the data and
 
 ## Not yet done
 
-No live model has been run. No cost or latency figure here is a measurement of a real provider. Subgroups with few groups produce wide intervals that should be read as such.
+Live provider runs and provider cost or latency measurements remain pending. Small subgroups have limited precision even when a bootstrap interval is narrow or degenerate.
