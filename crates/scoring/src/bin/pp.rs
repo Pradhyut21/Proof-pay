@@ -3,8 +3,8 @@ use std::io::{self, BufRead, BufReader, BufWriter, Write};
 use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Context, Result};
-use clap::{Parser, Subcommand};
-use panelproof_oracle::{verify_scene, Scene};
+use clap::{Parser, Subcommand, ValueEnum};
+use panelproof_oracle::{verify_scene_with_rule, PumpRule, Scene};
 use panelproof_scoring::{manifest::write_manifest, score, Prediction, Reference};
 use serde::de::DeserializeOwned;
 
@@ -18,6 +18,12 @@ struct Arguments {
     command: Command,
 }
 
+#[derive(Clone, Copy, ValueEnum)]
+enum VerifyRule {
+    Delta,
+    InletFloor,
+}
+
 #[derive(Subcommand)]
 enum Command {
     /// Verify rule outcomes independently for JSONL scene records.
@@ -25,6 +31,9 @@ enum Command {
         /// Scene JSONL file or '-' for stdin.
         #[arg(long)]
         scenes: PathBuf,
+        /// Pump rule used for all scenes in this request.
+        #[arg(long, value_enum, default_value = "delta")]
+        rule: VerifyRule,
     },
     /// Score a single matched condition against private reference records.
     Score {
@@ -74,10 +83,14 @@ fn main() -> Result<()> {
     let args = Arguments::parse();
     let mut stdout = BufWriter::new(io::stdout().lock());
     match args.command {
-        Command::Verify { scenes } => {
+        Command::Verify { scenes, rule } => {
+            let rule = match rule {
+                VerifyRule::Delta => PumpRule::Delta,
+                VerifyRule::InletFloor => PumpRule::InletFloor,
+            };
             let scenes = read_jsonl::<Scene>(&scenes)?;
             for scene in scenes {
-                let verified = verify_scene(&scene)
+                let verified = verify_scene_with_rule(&scene, rule)
                     .with_context(|| format!("verify scene {}", scene.base_scene_id))?;
                 json_line(&mut stdout, &verified)?;
             }

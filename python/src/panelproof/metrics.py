@@ -420,17 +420,27 @@ def build_report(
         }
         for c in present:
             rows = [r for r in by_cond[c] if r["task_id"] in matched]
-            groups: dict[str, list[int]] = defaultdict(list)
-            for r in rows:
-                groups[r["group_id"]].append(int(r["outcome"] == "correct"))
             lat = sorted(r["latency_ms"] for r in rows if r["latency_ms"] is not None)
             costs = [r["cost_usd"] for r in rows if r["cost_usd"] is not None]
+            by_skill = {
+                skill: [r for r in rows if r["skill"] == skill]
+                for skill in sorted({r["skill"] for r in rows})
+            }
+            operating_rules = (
+                {"delta": "state", "inlet_floor": "inlet_state"}
+                if any(r["kind"] == "inlet_state" for r in rows) else {}
+            )
             mrep["conditions"][c] = {
                 **summarize(rows),
-                "ci_all_attempt_accuracy": bootstrap_ci(groups),
+                "ci_all_attempt_accuracy": _accuracy_interval(rows),
                 "by_skill": {
-                    s: summarize([r for r in rows if r["skill"] == s]) for s in sorted({r["skill"] for r in rows})
+                    skill: {
+                        **summarize(part),
+                        "ci_all_attempt_accuracy": _accuracy_interval(part),
+                    }
+                    for skill, part in by_skill.items()
                 },
+                **({"by_operating_rule": _by_operating_rule(rows, operating_rules)} if operating_rules else {}),
                 "by_difficulty": {
                     d: summarize([r for r in rows if r["difficulty"] == d])
                     for d in ("easy", "medium", "hard")
@@ -449,6 +459,26 @@ def build_report(
             {c: [r for r in by_cond[c] if r["task_id"] in matched] for c in present}
         )
         report["models"][m] = mrep
+    return report
+
+
+def _accuracy_interval(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    groups: dict[str, list[int]] = defaultdict(list)
+    for row in rows:
+        groups[row["group_id"]].append(int(row["outcome"] == "correct"))
+    return bootstrap_ci(groups)
+
+
+def _by_operating_rule(rows: list[dict[str, Any]], rules: dict[str, str]) -> dict[str, Any]:
+    report = {}
+    for name, kind in rules.items():
+        cases = [row for row in rows if row["kind"] == kind]
+        if cases:
+            report[name] = {
+                **summarize(cases),
+                "ci_all_attempt_accuracy": _accuracy_interval(cases),
+                "pairs": pair_metrics(cases),
+            }
     return report
 
 
@@ -516,13 +546,29 @@ def render_markdown(rep: dict[str, Any]) -> str:
                 "",
                 f"### {c} detail",
                 "",
-                "| skill | valid | correct | valid-only | all-attempt |",
-                "|---|---|---|---|---|",
+                "| skill | valid | correct | valid-only | all-attempt | 95% group interval |",
+                "|---|---|---|---|---|---|",
             ]
             for k, v in s["by_skill"].items():
+                ci = v.get("ci_all_attempt_accuracy")
+                interval = f"{ci.get('lo95')}–{ci.get('hi95')} ({ci['n_groups']} groups)" if ci else "—"
                 L.append(
-                    f"| {k} | {v['valid']} | {v['correct']} | {v['valid_only_accuracy']} | {v['all_attempt_accuracy']} |"
+                    f"| {k} | {v['valid']} | {v['correct']} | {v['valid_only_accuracy']} | {v['all_attempt_accuracy']} "
+                    f"| {interval} |"
                 )
+            if operating_rules := s.get("by_operating_rule"):
+                L += [
+                    "",
+                    "| operating-state rule | attempts | correct | all-attempt | 95% group interval | semantic pairs |",
+                    "|---|---|---|---|---|---|",
+                ]
+                for rule, stats in operating_rules.items():
+                    ci = stats["ci_all_attempt_accuracy"]
+                    L.append(
+                        f"| {rule} | {stats['attempted']} | {stats['correct']} | {stats['all_attempt_accuracy']} "
+                        f"| {ci.get('lo95')}–{ci.get('hi95')} ({ci['n_groups']} groups) "
+                        f"| {stats['pairs']['semantic']['pairs']} |"
+                    )
             L += ["", "| difficulty | valid | correct | valid-only | all-attempt |", "|---|---|---|---|---|"]
             for k, v in s["by_difficulty"].items():
                 L.append(
@@ -544,6 +590,7 @@ def render_markdown(rep: dict[str, Any]) -> str:
         "## Interpretation limits",
         "",
         "- Intervals are base-group cluster bootstraps; groups are not independent draws from a wider population.",
+        "- Small skill cohorts have limited precision. With few groups, an interval can be unstable or degenerate.",
         "- C3 supplies verified readings as text and therefore isolates rule reasoning; it is not a vision score.",
         "- Missing responses are excluded from the matched set and listed separately; they are never counted as correct.",
         "- The missing-evidence diagnostic set is reported separately and is not part of these aggregates.",

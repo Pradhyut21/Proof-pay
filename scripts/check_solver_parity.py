@@ -8,15 +8,15 @@ import sys
 from dataclasses import asdict
 from pathlib import Path
 
-from panelproof.rules import PUMP_RULE
-from panelproof.rust_bridge import RustVerificationError, verify_scenes
+from panelproof.rules import INLET_FLOOR_RULE, PUMP_RULE
+from panelproof.rust_bridge import RustVerificationError, VerifierRule, verify_scenes
 from panelproof.schemas import Scene
 
 PRESSURE_UNITS = ("kPa", "bar", "psi")
 PRESSURE_LIMITS = {"kPa": 900_000, "bar": 9_000, "psi": 130_000}
 
 
-def sample_scenes(count: int, seed: int) -> list[Scene]:
+def sample_scenes(count: int, seed: int, rule: VerifierRule = "delta") -> list[Scene]:
     rng = random.Random(seed)
     scenes = []
     for index in range(count):
@@ -30,13 +30,20 @@ def sample_scenes(count: int, seed: int) -> list[Scene]:
                 inlet_unit, outlet_unit = rng.choices(PRESSURE_UNITS, k=2)
                 inlet = rng.randint(-2_000, PRESSURE_LIMITS[inlet_unit])
                 outlet = rng.randint(-2_000, PRESSURE_LIMITS[outlet_unit])
+            inlet_boundary = rule == "inlet-floor" and pump_id == 1 and index < 3
+            if inlet_boundary:
+                # The first three running pumps cover below, exactly at, and above 150 kPa.
+                inlet_unit, inlet = (
+                    ("bar", 1_500) if index == 1 else ("kPa", 149_999 + index)
+                )
+            running = bool(rng.randrange(2)) or inlet_boundary
             equipment.append(
                 {
                     "id": f"pump-{pump_id}",
                     "label": f"Pump {pump_id}",
                     "inlet": {"unit": inlet_unit, "value_milli": inlet},
                     "outlet": {"unit": outlet_unit, "value_milli": outlet},
-                    "run": bool(rng.randrange(2)),
+                    "run": running,
                     "alarm": bool(rng.randrange(2)),
                 }
             )
@@ -64,16 +71,19 @@ def main() -> int:
     )
     parser.add_argument("--count", type=int, default=1_000)
     parser.add_argument("--seed", type=int, default=4628501)
+    parser.add_argument("--rule", choices=("delta", "inlet-floor"), default="delta")
     args = parser.parse_args()
     if args.count < 1:
         parser.error("--count must be positive")
 
-    scenes = sample_scenes(args.count, args.seed)
+    scenes = sample_scenes(args.count, args.seed, args.rule)
+    solver = INLET_FLOOR_RULE if args.rule == "inlet-floor" else PUMP_RULE
     try:
         verified = verify_scenes(
             (scene.model_dump(mode="json") for scene in scenes),
             executable=args.pp,
             required=True,
+            rule=args.rule,
         )
     except RustVerificationError as exc:
         parser.error(str(exc))
@@ -85,7 +95,7 @@ def main() -> int:
         expected = {
             "base_scene_id": scene.base_scene_id,
             "equipment": [
-                {"id": pump.id, **asdict(PUMP_RULE.solve(pump))}
+                {"id": pump.id, **asdict(solver.solve(pump))}
                 for pump in scene.equipment
             ],
         }
@@ -95,16 +105,15 @@ def main() -> int:
             )
     for mismatch in mismatches[:5]:
         print(json.dumps(mismatch), file=sys.stderr)
-    print(
-        json.dumps(
-            {
-                "seed": args.seed,
-                "scenes_checked": len(scenes),
-                "pumps_checked": sum(len(scene.equipment) for scene in scenes),
-                "mismatches": len(mismatches),
-            }
-        )
-    )
+    report: dict[str, int | str] = {
+        "seed": args.seed,
+        "scenes_checked": len(scenes),
+        "pumps_checked": sum(len(scene.equipment) for scene in scenes),
+        "mismatches": len(mismatches),
+    }
+    if args.rule != "delta":
+        report["rule"] = args.rule
+    print(json.dumps(report))
     return int(bool(mismatches))
 
 

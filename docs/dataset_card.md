@@ -34,9 +34,23 @@ The [v0.3 expanded configuration](../configs/benchmark-expanded.yaml) adds `2p-c
 
 ![Two side-by-side pump modules with stacked gauges showing kPa, bar, and psi](assets/column-layout.png)
 
-The audited public build accepted **688 answerable tasks**, **285 valid question pairs**, and **40 separate diagnostic tasks**. It includes 347 single-pump, 160 two-pump row, and 181 two-pump column tasks. All three layouts occur in both development and frozen-style groups of this public reproducibility build. The audit found zero cross-split groups, images, and seeds. A second build reproduced its manifest SHA-256 `a8f51620ddfbfd13033e22804eae1be87cb043ead1db82cd08b44f0fc89c6d6a`. [Reproduce the expanded build](reproducibility.md#build-the-expanded-layout-dataset)
+The audited public build accepted **688 answerable tasks**, **285 valid question pairs**, and **40 separate diagnostic tasks**. It includes 347 single-pump, 160 two-pump row, and 181 two-pump column tasks. All three layouts occur in both development and frozen-style groups of this public reproducibility build. The audit found zero cross-split groups, images, and seeds. In the recorded build environment, a second build reproduced manifest SHA-256 `a8f51620ddfbfd13033e22804eae1be87cb043ead1db82cd08b44f0fc89c6d6a`. The digest covers encoded PNG bytes. [Rebuild and compare decoded pixels](reproducibility.md#artifact-hashes-and-decoded-pixels)
+
+The v0.3 balanced X counts were 12 Dev (3 per cell), 80 frozen main, and 72 frozen held-out style. Report subgroup intervals alongside the number of base groups. Treat the small Dev slice as exploratory even if a bootstrap interval happens to be narrow.
 
 ## Current private holdout
+
+The [v0.4 configuration](../configs/benchmark-dual-rule.yaml) uses all three layouts and adds operating-state tasks based on an inlet-pressure floor. The audit recorded **1,002** answerable tasks, **803** of them frozen, and **40** separate diagnostics. It checked **437** valid pairs. The new rule accounts for **300** tasks and **91** semantic pairs across all three layouts, including **102** inlet tasks in the column layout. Of those semantic pairs, **57** are targeted inlet-only crossings that preserve the pressure-difference classification.
+
+| Split | Answerable | Inlet-floor tasks | Available X | Balanced X |
+| --- | ---: | ---: | ---: | ---: |
+| Dev | 199 | 61 | 46 | 32 |
+| Frozen main | 559 | 166 | 135 | 120 |
+| Frozen held-out style | 244 | 73 | 62 | 32 |
+
+The default [measured preparation](../evals/conditions.md#measured-runs-need-a-freeze) selected **758** frozen tasks, including **239** inlet-floor tasks and **152** balanced X tasks. The v0.4 holdout and its selection have their own commitments. Use the pinned v0.4 cohort for runs intended to evaluate both rules and all three layouts. [Private build instructions](reproducibility.md#build-a-private-evaluation-holdout)
+
+## v0.2 reference holdout
 
 The audited v0.2 rebuild contains 696 answerable tasks, including 545 frozen tasks, 40 separate diagnostic tasks, and 282 valid question pairs across Dev and frozen splits. The answerable skill counts are R 100, C 80, M 269 and X 247. The audit found no overlap in group, image, or seed across splits. The rebuild preserved the original public files and all earlier private commitments.
 
@@ -64,7 +78,7 @@ All content is fictional. Public files contain no per-task answers, seeds or evi
 
 ## Limitations
 
-- The v0.2 holdout covers two layouts. The expanded public build covers three layouts under the same pressure-rule family and four themes. Real photographs are outside the evaluated scope.
+- The v0.4 holdout covers three layouts, two operating-state rules, and four themes. Real photographs are outside the evaluated scope.
 - The historical unbalanced X set had an ALARM-lamp cue shift of up to 28 percentage points. The full current set and its balanced slice have separate audit figures. The balanced slice controls the marginal ALARM cue only. [Validation results](validation.md)
 - C tasks request the outlet pressure only.
 - Zero human reviewers; the 50-task worksheet is unreviewed.

@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-from .rules import PUMP_RULE, conversion_rules_text, convert_pressure
+from .rules import INLET_FLOOR_RULE, PUMP_RULE, conversion_rules_text, convert_pressure
 from .schemas import (
     SCHEMA_VERSION,
     Answer,
@@ -24,6 +24,7 @@ QuestionKind = Literal[
     "compare_outlets",
     "pressure_difference",
     "operating_state",
+    "inlet_state",
     "alarm_consistency",
 ]
 
@@ -86,7 +87,7 @@ def build_question(
         raise ValueError("unknown equipment ID")
 
     label = f"“{pump.label}”"
-    result = PUMP_RULE.solve(pump)
+    result = (INLET_FLOOR_RULE if kind == "inlet_state" else PUMP_RULE).solve(pump)
     public_rules = "Use the visible labels, pressure scales and indicators."
     answer: Answer
     skill: Skill
@@ -134,6 +135,17 @@ def build_question(
         choices = sorted([first.label, second.label])
         answer = CategoryAnswer(kind="category", value=winner.label)
         skill = "association"
+    elif kind == "inlet_state":
+        state = INLET_FLOOR_RULE.state_for_interval(
+            pump.run, result.inlet_milli_kpa, uncertainty_milli_kpa
+        )
+        if state is None:
+            raise AmbiguousQuestion("reading uncertainty spans the inlet-pressure threshold")
+        question = f"What operating state does the inlet-pressure rule assign to {label}?"
+        public_rules = INLET_FLOOR_RULE.public_text
+        choices = ["STOPPED", "NORMAL", "LOW_PRESSURE"]
+        answer = CategoryAnswer(kind="category", value=state)
+        skill = "operational_state"
     elif kind in ("operating_state", "alarm_consistency"):
         if not PUMP_RULE.has_unique_state(pump, uncertainty_milli_kpa):
             raise AmbiguousQuestion("reading uncertainty spans the pressure threshold")
