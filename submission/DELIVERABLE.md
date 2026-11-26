@@ -43,8 +43,8 @@ For an extracted source ZIP, bootstrap the dependencies and generate a local dev
 
 ## Verify the registered portal
 
-- [ ] Confirm the registered roster and team eligibility. The public event lists 3–4 people per registered team.
-- [ ] Confirm the exact cutoff and timezone for the 6 December 2026 submission deadline, required Track 2 fields and interfaces, upload formats and size limits, and whether a separate judge key can be submitted.
+- [ ] Confirm that both members appear on the registered Track 2 roster. A two-person team meets the [published size rule](../reference/SUBMISSION.md#registered-dashboard-checks).
+- [ ] Confirm the exact cutoff and timezone for the 6 December 2026 submission deadline, required Track 2 fields and interfaces, upload formats and size limits, and whether a separate judge key can be submitted. The [public schedule and event configuration](../reference/SUBMISSION.md#registered-dashboard-checks) show different cutoff times. Plan to submit before the earlier time.
 - [ ] Record the final artifact names, hashes, command logs, and outstanding evidence gaps. Have a registered team member perform the portal submission after review.
 
 [Official event](https://hack2skill.com/event/innodata/) · [Submission issue #20](https://github.com/Pradhyut21/Proof-pay/issues/20)

@@ -1,6 +1,6 @@
 # Innodata Frontier AI Hackathon 2026
 
-PanelProof is a Track 2 Visual Task Factory project. The public event page lists **6 December 2026** as the submission date and **3–4 participants** per registered team. Confirm the cutoff timezone, roster, and exact artifact formats in the registered portal. [Official event and Track 2 rules](https://hack2skill.com/event/innodata/?sectionid=6aee108b9be15aea67016065)
+PanelProof is a Track 2 Visual Task Factory project. The public schedule lists **6 December 2026** as the submission date. The organizer's current event data allows solo entries and teams of up to four. [Official event](https://hack2skill.com/event/innodata/) · [Current event data](https://hack2skill.com/api/v1/event/innodata/event-details)
 
 The public brief calls for reusable source and setup, inspectable samples with validation, findings on multimodal model strengths and weaknesses, and a technical demo that distinguishes correct from incorrect responses. The [submission checklist](../submission/DELIVERABLE.md) maps those outputs to the repository and records what remains pending.
 
@@ -14,8 +14,10 @@ The public brief calls for reusable source and setup, inspectable samples with v
 
 ## Registered dashboard checks
 
-- [ ] Verify the registered roster. Resolve the third-participant requirement if the roster has two people.
-- [ ] Verify the local deadline time and timezone, required Track 2 interface, upload format and size limits.
+The public timeline and FAQ give **6 December 2026 at 11:59 PM IST**. The live event configuration gives a submission end time of **11:55 PM IST** on the same day. Check the registered dashboard and plan to submit before the earlier time. [Public timeline](https://hack2skill.com/event/innodata/?sectionid=6aedaccb6808a5c6d6fc4f6e) · [Current event data](https://hack2skill.com/api/v1/event/innodata/event-details)
+
+- [ ] Confirm that both members are registered on the Track 2 roster. A two-person team meets the published size rule.
+- [ ] Verify the submission cutoff, required Track 2 interface, upload formats and size limits in the registered dashboard.
 - [ ] Verify the permitted model API access and usage limits before paid inference.
 - [ ] Verify which interface, sample formats, and demo artifacts the portal accepts. Confirm whether the portal accepts a separate judge key.
 
