@@ -89,7 +89,7 @@ The backlog is split **10 issues and 43 estimated effort points each**. Begin wi
 
 ## Release checklist
 
-- [ ] Confirm the registered roster and portal specifics in #1. Hack2skill lists **3–4 participants**. If the registered team currently has two, resolve the third-participant requirement.
+- [ ] Confirm the registered Track 2 roster. The organizer allows teams of one to four, so the two-person team meets the size rule. See the [submission requirements](reference/SUBMISSION.md#registered-dashboard-checks).
 - [ ] Deliver runnable source and setup steps, samples and a separate review key, validation/test logs, report and figures, license notices, source commit, and artifact checksums.
 - [ ] Rehearse a three-minute demo. Generate a new panel, answer it, compare a semantic and nuisance variant, reveal independent evidence, and show measured results or an explicitly labeled demo fixture.
 - [ ] Audit package contents and recreate a sample from a clean checkout. Preserve exact commands, actual test outcomes, example paths, known gaps and the next handoff.

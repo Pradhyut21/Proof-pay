@@ -6,10 +6,10 @@ PanelProof is a Track 2 visual benchmark for reading and reasoning over fictiona
 
 | Submission artifact | Review it here | Release status |
 | --- | --- | --- |
-| Reusable generation and evaluation source, setup, and commands | [README](../README.md) · [Reproduction guide](../docs/reproducibility.md) · [Architecture](../docs/architecture.md) | Runnable offline. Pin the final commit and archive checksum after the upload format is confirmed. |
-| Inspectable sample images and public questions | [Public demo bundle](https://github.com/Pradhyut21/Proof-pay/tree/main/data/demo/public) · [Worked example](../README.md#one-question-three-panels) · [Task card](../docs/task_card.md) | Public examples available. Keep approved judge answers in a separate artifact for the registered review flow. |
-| Validation and tests | [Dataset card](../docs/dataset_card.md) · [Validation](../docs/validation.md) · [CI](https://github.com/Pradhyut21/Proof-pay/actions/runs/45449233021) · [Platform checks](https://github.com/Pradhyut21/Proof-pay/actions/runs/45449232901) | Automated evidence available. Two human reviews and agreement remain pending. |
-| Model strengths and weaknesses | [Evaluation evidence](../docs/evaluation_results.md) · [Protocol](../evals/protocol.md) · [Research issue #18](https://github.com/Pradhyut21/Proof-pay/issues/18) | Matched preflight complete. Authorized provider runs and measured findings remain pending. Label mock evidence **DEMO ONLY**. |
+| Reusable generation and evaluation source, setup, and commands | [README](../README.md) · [Reproduction guide](../docs/reproducibility.md) · [Architecture](../docs/architecture.md) | The source candidate reproduced byte-for-byte and passed the extracted Windows core smoke. Record the exact commit and archive SHA-256 for the final upload. |
+| Inspectable sample images and public questions | [Public demo bundle](https://github.com/Pradhyut21/Proof-pay/tree/main/data/demo/public) · [Worked example](../README.md#one-question-three-panels) · [Task card](../docs/task_card.md) | The local review package has six verified sample tasks and three comparison pairs. The companion archive binds the six judge answers to the sample manifest. |
+| Validation and tests | [Dataset card](../docs/dataset_card.md) · [Validation](../docs/validation.md) · [CI](https://github.com/Pradhyut21/Proof-pay/actions/runs/45564997958) · [Platform checks](https://github.com/Pradhyut21/Proof-pay/actions/runs/45564997988) | Automated evidence and a blinded 50-task development review pack are available. Both reviewers' worksheets and agreement are pending. |
+| Model strengths and weaknesses | [Evaluation evidence](../docs/evaluation_results.md) · [Protocol](../evals/protocol.md) · [Research issue #18](https://github.com/Pradhyut21/Proof-pay/issues/18) | C0, C1, and C3 preflight passed on the same 50 v0.4 development tasks. C3 recovered 33 distinct images. The live pilot plans 150 initial requests per model before retries. Provider calls and measured findings remain pending. |
 | Technical explanation and scoring demo | [Architecture](../docs/architecture.md) · [Three-minute script](demo_script.md) · [Browser rehearsal](https://github.com/Pradhyut21/Proof-pay/pull/25) | Six automated browser scenarios passed. The live three-minute presentation remains to be timed. |
 | Provenance and redistribution | [MIT code license](../LICENSE) · [Third-party notices](../THIRD_PARTY_NOTICES.md) · [Dataset sources](../docs/dataset_sources.md) | Code and bundled font provenance documented. Generated dataset release terms need a team decision. |
 
@@ -23,9 +23,9 @@ PanelProof is a Track 2 visual benchmark for reading and reasoning over fictiona
 
 ## Verified application baseline
 
-The application baseline is source commit `15cec4261fcdb08e61066c820cae46e534a39dc7`, merged into `main` as `57b3291f9bd9974736db74f91b03af14c9c78f8d`. The native Windows Edge run passed all six browser scenarios in 63.7 seconds wall time. The production build and 21 web tests passed. The automated suite covers generation, scoring, both counterfactuals, authorized reveal, refusal, job expiry, and report export. The fixture report covered 71 matched tasks from a local reproducibility build. [PR verification record](https://github.com/Pradhyut21/Proof-pay/pull/25)
+The v0.4 engineering baseline is merge commit `1b42239f1f9938fca84960b0724e3f3f2d9d1f18`. Its extracted source ZIP passed 16 native Windows core checks, including a locked Rust build and Axum API scoring. The optional web check was run separately on the matching source tree. A fresh production build passed six Windows Edge scenarios in 118.98 seconds of test wall time, covering generation, scoring, counterfactual comparisons, reveal, refusal, report export, and job expiry. The browser report used 71 matched offline tasks labeled **DEMO ONLY**. [v0.4 merge evidence](https://github.com/Pradhyut21/Proof-pay/pull/28)
 
-Linux CI passed the production web build and full pipeline smoke. The separate platform workflow passed Compose build/startup and macOS core checks. Pin the actual submission commit and the generated ZIP's checksum before uploading. [Linux CI](https://github.com/Pradhyut21/Proof-pay/actions/runs/45449233021) · [Platform workflow](https://github.com/Pradhyut21/Proof-pay/actions/runs/45449232901)
+Linux CI passed the production web build and full pipeline smoke. The separate platform workflow passed Compose build/startup and macOS core checks. [Linux CI](https://github.com/Pradhyut21/Proof-pay/actions/runs/45564997958) · [Platform workflow](https://github.com/Pradhyut21/Proof-pay/actions/runs/45564997988)
 
 ## Build the source ZIP
 
@@ -43,8 +43,8 @@ For an extracted source ZIP, bootstrap the dependencies and generate a local dev
 
 ## Verify the registered portal
 
-- [ ] Confirm the registered roster and team eligibility. The public event lists 3–4 people per registered team.
-- [ ] Confirm the exact cutoff and timezone for the 6 December 2026 submission deadline, required Track 2 fields and interfaces, upload formats and size limits, and whether a separate judge key can be submitted.
+- [ ] Confirm that both members appear on the registered Track 2 roster. A two-person team meets the [published size rule](../reference/SUBMISSION.md#registered-dashboard-checks).
+- [ ] Confirm the exact cutoff and timezone for the 6 December 2026 submission deadline, required Track 2 fields and interfaces, upload formats and size limits, and whether a separate judge key can be submitted. The [public schedule and event configuration](../reference/SUBMISSION.md#registered-dashboard-checks) show different cutoff times. Plan to submit before the earlier time.
 - [ ] Record the final artifact names, hashes, command logs, and outstanding evidence gaps. Have a registered team member perform the portal submission after review.
 
 [Official event](https://hack2skill.com/event/innodata/) · [Submission issue #20](https://github.com/Pradhyut21/Proof-pay/issues/20)
