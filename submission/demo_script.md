@@ -21,10 +21,22 @@ Before rehearsing, record the verified release SHA and keep its source manifest 
 
 Open **Run Reports** using the locally generated aggregates. The offline report is labeled **DEMO ONLY**. Keep the artifact used by the view alongside the release notes. The [reproduction commands](../README.md#quickstart) generate the report locally.
 
-## Five slides
+## Organizer deck
 
-1. **Problem** — reading and reasoning from fictional pump panels.
-2. **Factory** — seeded images, public questions, and deterministic references.
-3. **Validation** — independent raster readings and rules, rejection checks, and paired variants.
-4. **Evidence** — judge interaction, real model findings when measured, and an example failure.
-5. **Reproduce** — release SHA, manifest, command, and limitations.
+Use the organizer's submission template and enter the exact registered team and leader names on the cover. [Deck template](https://docs.google.com/presentation/d/1fXZJ86GvJ-UnR4C7CkeWoTnzNqC7-gznV7efty8Su50/edit)
+
+| Template slide | PanelProof content |
+| --- | --- |
+| Cover | Registered team and leader names. Track 2, Visual Task Factory. PanelProof measures whether models can read gauges, link evidence to the right pump, and apply operational rules. |
+| Idea brief | Generate synthetic pump panels, write grounded questions, and independently verify deterministic reference answers. Evaluate existing vision models under matched input conditions. |
+| Opportunity and differentiation | A model can read a plausible value yet attach it to the wrong pump or ignore the rule threshold. Independent pixel readings and controlled visual pairs help locate those failures. |
+| Features | Show the seeded Factory, Arena comparison, Evidence Inspector, and report. Use an actual semantic pair and nuisance pair. |
+| Process | Seed → render → generate questions and references → verify pixels and rules → freeze grouped tasks → evaluate models → score and report. |
+| Wireframes or mock diagrams, optional | Use actual product screenshots if this slide is included. |
+| Architecture | Diagram the Python generator, raster verifier and runner, Rust verifier and scorer, Axum/SQLite demo service, and Next.js console. Mark the public task boundary and authorized evidence reveal. |
+| Technologies | List Python, Pillow, OpenCV, Rust, Axum, SQLite, Next.js, and Docker. List evaluated provider models and revisions after live runs. |
+| Estimated cost, optional | Use actual tracked costs if available, with scope and request counts. |
+| Deliverables | Link the pinned source, sample tasks, validation logs, technical docs, measured results when available, and recorded walkthrough. Label offline report images **DEMO ONLY**. |
+| Closing | Preserve the template closing slide. |
+
+Record the walkthrough from the running app. Show a fresh generation, one correct and one incorrect scored response, and the independent evidence. Close on the final artifact checksums and the scope of the measured results.
