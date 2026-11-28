@@ -99,4 +99,4 @@ Raster agreement covers clean synthetic renders from this generator. The opt-in 
 
 The development preflight covers 50 tasks from 21 groups and checks planned input coverage. For later measured comparisons, report each cohort's task and group counts alongside group-based intervals. Subgroups with few independent groups have more uncertain estimates. Human judgments and authorized live model results remain pending. [Preflight and evaluation protocol](evaluation_results.md) · [Evaluation conditions](../evals/conditions.md)
 
-Later platform checks cover Compose build and startup, macOS core tests, and the Windows browser walkthrough. [Platform checks](https://github.com/Pradhyut21/Proof-pay/actions/runs/45449232901)
+Later platform checks cover Compose build and startup, macOS core tests, and the Windows browser walkthrough. [Platform checks](https://github.com/Pradhyut21/Panel_Proof/actions/runs/45449232901)

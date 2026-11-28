@@ -14,7 +14,7 @@ A separate coding-agent session reviewed the readiness changes using the PRD rub
 | Measured results accepted incomplete cohorts or input changes under the same task IDs | The measured gate requires an exact matched C0/C1/C3 cohort and verifies each run's prompt and image commitments against the approved holdout. [Evaluation conditions](../evals/conditions.md#measured-runs-need-a-freeze) |
 | A change in display tolerance suppressed preserving-pair invariance for identical answers | Pair invariance compares values and units. Each task's correctness still uses its own tolerance. |
 
-The v0.4 benchmark includes three layouts and two operating-state rules. The web Inspector and Run Reports shipped with a passing six-scenario browser rehearsal. Live-model findings, human judgments, and the timed final presentation remain pending. [Judge console changes](https://github.com/Pradhyut21/Proof-pay/pull/25) · [Current evidence status](evaluation_results.md)
+The v0.4 benchmark includes three layouts and two operating-state rules. The web Inspector and Run Reports shipped with a passing six-scenario browser rehearsal. The team has recorded the 2:55 walkthrough. Live-model findings and human judgments remain pending. [Judge console changes](https://github.com/Pradhyut21/Panel_Proof/pull/25) · [Current evidence status](evaluation_results.md)
 
 ## Historical rubric matrix
 

@@ -1,10 +1,14 @@
 # PanelProof
 
-**A visual benchmark for reading gauges, associating instruments with the right pump, and applying explicit rules.**
+**A visual benchmark for reading gauges, matching instruments to the correct pump, and applying operating rules.**
 
-Built for the Innodata Frontier AI Hackathon, Track 2 · Visual Task Factory. PanelProof generates fictional water-pump panels, questions, and deterministic answers. A separate PNG verifier checks what is visible before accepted tasks enter the benchmark. An independent Rust implementation checks the rules, and a local judge console shows how scoring and evidence reveal work. [Official Track 2 brief](https://hack2skill.com/event/innodata/?sectionid=6aee108b9be15aea67016065)
+Team **TXET** · KM Pradhyut and Sai Kishan · Innodata AI Hackathon, Track 2 · Visual Task Factory.
 
-[Try it locally](#quickstart) · [See a benchmark task](#one-question-three-panels) · [Review the evidence](#evidence-and-status) · [Submission checklist](submission/DELIVERABLE.md)
+PanelProof generates fictional water-pump panels with deterministic answers. An independent PNG verifier recovers the visible readings, and a Rust solver cross-checks the rule outcome. The local console lets judges generate a task, score an answer, and inspect its evidence.
+
+[Run the demo](#quickstart) · [Try a benchmark question](#one-question-three-panels) · [Review validation](#evidence-and-status) · [Submission deck](https://github.com/Pradhyut21/Panel_Proof/blob/main/submission/PanelProof_Innodata_Idea_Submission.pdf) · [Submission handoff](submission/DELIVERABLE.md)
+
+**Evidence status** · Local scoring, reproducibility, and automated validation are available. Live model results and human answerability review are pending. The console labels offline fixture reports **DEMO ONLY**.
 
 ![PanelProof Evidence Inspector showing a fictional pump panel, an authorized reference answer, and recovered gauge readings with uncertainty](docs/assets/evidence-inspector.png)
 
@@ -27,8 +31,8 @@ The same question applies to all three panels. A reader who follows the evidence
 Use a Git checkout for the exact examples above. The local demo runs on CPU and uses fixture model attempts.
 
 ```sh
-git clone https://github.com/Pradhyut21/Proof-pay.git
-cd Proof-pay
+git clone https://github.com/Pradhyut21/Panel_Proof.git
+cd Panel_Proof
 ```
 
 ### Start the judge console
@@ -52,6 +56,10 @@ Open [http://127.0.0.1:3000](http://127.0.0.1:3000).
 
 For a Compose preview, run `docker compose up --build`. Compose serves the checked-in Arena and Inspector examples. Use the native steps above for new Factory generation. For an extracted source ZIP, generate the demo bundle before either launch path. [Source ZIP setup and test commands](docs/reproducibility.md#start-from-an-extracted-source-zip)
 
+### Reproduce the benchmark locally
+
+Run `./run.sh reproduce` on Linux, macOS, or WSL, or `.\run.ps1 reproduce` in PowerShell. This generates an offline benchmark bundle and a report marked **DEMO ONLY**. [Reproduction guide](docs/reproducibility.md)
+
 ## How the benchmark works
 
 ```mermaid
@@ -71,19 +79,15 @@ flowchart LR
 
 ## Evidence and status
 
-| Track 2 criterion | PanelProof evidence |
+| Check | Evidence |
 | --- | --- |
-| Implementation and repeatability · 25% | Seeded generator, grouped export, CLI smoke, dataset audit, and local judge console. Windows browser checks and Linux CI passed. Compose build/startup and macOS core tests passed. [Reproduction guide](docs/reproducibility.md) |
-| Validity · 25% | Independent raster recovery on **19 of 20** clean scenes, with exact agreement on all 19 recoveries. Independent Python/Rust rules agreed on **1,000** seeded scenes. Human review is pending. [Validation](docs/validation.md) |
-| Meaningful variation · 20% | The v0.4 holdout contains **1,002** answerable tasks across three layouts and two operating-state rules, including **300** inlet-floor tasks and **437** valid pairs. Measured runs default to the balanced X scope. [Dataset card](docs/dataset_card.md) |
-| Originality and engineering judgment · 15% | Visible readings, independent checks, matched input conditions, and pair-preserving shortcut controls. A 50-task development cohort passed C0/C1/C3 preflight. Live-model findings are pending. [Evaluation status](docs/evaluation_results.md) · [Prior-work audit](docs/source_audit.md) |
-| Practical impact and communication · 15% | Generate, answer, compare, and reveal evidence in the browser. The walkthrough shows a rule-threshold error and a formatting-only change. The automated browser rehearsal passed. The timed presentation is pending. [Demo walkthrough](submission/demo_script.md) |
-
-The production verifier is scoped to clean synthetic renders. A performance gap between development and frozen splits remains unmeasured. Human review is **0 of 50**, and live model results are pending. The screenshot below shows an offline report labeled **DEMO ONLY**. [Evaluation status and limits](docs/evaluation_results.md)
+| Clean raster verification | **19 of 20** clean scenes recovered, with exact agreement on every recovery. Production verification targets clean renders. [Validation](docs/validation.md) |
+| Independent rules | Python and Rust agreed on **1,500 pump cases per rule**. [Solver parity](docs/validation.md#4-cross-implementation-parity) |
+| Dataset variation | Three layouts, two operating-state rules, and semantic and style-only pairs. The published v0.4 audit reports **1,002 answerable tasks** and **437 valid pairs**. [Dataset card](docs/dataset_card.md) |
+| Evaluation readiness | A **50-task** development cohort passed the matched C0/C1/C3 preflight. Authorized model runs and the independent human audit remain pending. [Evaluation status](docs/evaluation_results.md) |
+| Application | Windows browser, Linux CI, macOS core, and Compose preview checks are documented. The **2:55** walkthrough records Factory generation, Arena scoring, and evidence reveal. [Submission handoff](submission/DELIVERABLE.md) |
 
 Dataset manifests pin encoded PNG bytes. Match the generation environment for an exact rebuild. When PNG hashes differ across environments, compare the decoded pixels separately. [Artifact hashes and decoded pixels](docs/reproducibility.md#artifact-hashes-and-decoded-pixels)
-
-![PanelProof Run Reports with a DEMO ONLY label, condition filters, valid-only and all-attempt accuracy columns, and an export link](docs/assets/run-reports-demo.png)
 
 ## Documentation
 

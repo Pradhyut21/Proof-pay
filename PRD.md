@@ -4,7 +4,7 @@
 **Owners** Pradhyut (`Pradhyut21`) and Kishan (`kishansaaai`)  
 **Submission deadline** 6 December 2026. Confirm the exact cutoff and submission format in the registered dashboard.
 
-[GitHub backlog](https://github.com/Pradhyut21/Proof-pay/issues) · [Build roadmap](https://github.com/Pradhyut21/Proof-pay/issues/1) · [Official Track 2 brief](https://hack2skill.com/event/innodata/?sectionid=6aee108b9be15aea67016065)
+[GitHub backlog](https://github.com/Pradhyut21/Panel_Proof/issues) · [Build roadmap](https://github.com/Pradhyut21/Panel_Proof/issues/1) · [Official Track 2 brief](https://hack2skill.com/event/innodata/?sectionid=6aee108b9be15aea67016065)
 
 ## What we are building
 
@@ -80,10 +80,10 @@ The backlog is split **10 issues and 43 estimated effort points each**. Begin wi
 
 | Stage | Pradhyut | Kishan | Exit evidence |
 | --- | --- | --- | --- |
-| Foundation | [#1 Contract and portal](https://github.com/Pradhyut21/Proof-pay/issues/1), [#4 Schemas](https://github.com/Pradhyut21/Proof-pay/issues/4) | [#2 Source audit](https://github.com/Pradhyut21/Proof-pay/issues/2), [#3 Scaffold](https://github.com/Pradhyut21/Proof-pay/issues/3) | Shared fixtures, compatible tools, local smoke entry point. |
-| Pilot | [#6 Rules/questions](https://github.com/Pradhyut21/Proof-pay/issues/6), [#8 Rust rules/scoring](https://github.com/Pradhyut21/Proof-pay/issues/8), [#10 Pilot](https://github.com/Pradhyut21/Proof-pay/issues/10), [#12 Evaluation runner](https://github.com/Pradhyut21/Proof-pay/issues/12) | [#5 Renderer](https://github.com/Pradhyut21/Proof-pay/issues/5), [#7 Variants](https://github.com/Pradhyut21/Proof-pay/issues/7), [#9 Raster verifier](https://github.com/Pradhyut21/Proof-pay/issues/9) | Verified pilot, recorded failures, offline model fixture. |
-| Freeze and integrate | [#14 Axum API](https://github.com/Pradhyut21/Proof-pay/issues/14), [#16 Evidence/Reports](https://github.com/Pradhyut21/Proof-pay/issues/16) | [#11 Dataset freeze](https://github.com/Pradhyut21/Proof-pay/issues/11), [#13 Conditions/metrics](https://github.com/Pradhyut21/Proof-pay/issues/13), [#15 Factory/Arena](https://github.com/Pradhyut21/Proof-pay/issues/15), [#17 Reproducibility](https://github.com/Pradhyut21/Proof-pay/issues/17) | Hashed test set, judge workflow, one-command reproducibility. |
-| Report and release | [#18 Measured results](https://github.com/Pradhyut21/Proof-pay/issues/18), [#20 Package/demo](https://github.com/Pradhyut21/Proof-pay/issues/20) | [#19 Independent audit](https://github.com/Pradhyut21/Proof-pay/issues/19) | Traceable findings, audit, release package, rehearsed demo. |
+| Foundation | [#1 Contract and portal](https://github.com/Pradhyut21/Panel_Proof/issues/1), [#4 Schemas](https://github.com/Pradhyut21/Panel_Proof/issues/4) | [#2 Source audit](https://github.com/Pradhyut21/Panel_Proof/issues/2), [#3 Scaffold](https://github.com/Pradhyut21/Panel_Proof/issues/3) | Shared fixtures, compatible tools, local smoke entry point. |
+| Pilot | [#6 Rules/questions](https://github.com/Pradhyut21/Panel_Proof/issues/6), [#8 Rust rules/scoring](https://github.com/Pradhyut21/Panel_Proof/issues/8), [#10 Pilot](https://github.com/Pradhyut21/Panel_Proof/issues/10), [#12 Evaluation runner](https://github.com/Pradhyut21/Panel_Proof/issues/12) | [#5 Renderer](https://github.com/Pradhyut21/Panel_Proof/issues/5), [#7 Variants](https://github.com/Pradhyut21/Panel_Proof/issues/7), [#9 Raster verifier](https://github.com/Pradhyut21/Panel_Proof/issues/9) | Verified pilot, recorded failures, offline model fixture. |
+| Freeze and integrate | [#14 Axum API](https://github.com/Pradhyut21/Panel_Proof/issues/14), [#16 Evidence/Reports](https://github.com/Pradhyut21/Panel_Proof/issues/16) | [#11 Dataset freeze](https://github.com/Pradhyut21/Panel_Proof/issues/11), [#13 Conditions/metrics](https://github.com/Pradhyut21/Panel_Proof/issues/13), [#15 Factory/Arena](https://github.com/Pradhyut21/Panel_Proof/issues/15), [#17 Reproducibility](https://github.com/Pradhyut21/Panel_Proof/issues/17) | Hashed test set, judge workflow, one-command reproducibility. |
+| Report and release | [#18 Measured results](https://github.com/Pradhyut21/Panel_Proof/issues/18), [#20 Package/demo](https://github.com/Pradhyut21/Panel_Proof/issues/20) | [#19 Independent audit](https://github.com/Pradhyut21/Panel_Proof/issues/19) | Traceable findings, audit, release package, rehearsed demo. |
 
 **Suggested checkpoints.** 24–26 Nov for contract and setup, 27–29 Nov for the pilot, 30 Nov–1 Dec for freeze, 2–4 Dec for measured runs and integration, 5 Dec for the final audit and rehearsal. If time is short, keep the independent verifier, grouped dataset, score and demo working. Defer advanced scales, external data, C2/C4 and frontend polish.
 
@@ -95,4 +95,4 @@ The backlog is split **10 issues and 43 estimated effort points each**. Begin wi
 - [ ] Audit package contents and recreate a sample from a clean checkout. Preserve exact commands, actual test outcomes, example paths, known gaps and the next handoff.
 - [ ] Confirm the registered team’s submission format, cutoff and permitted model access. Use the portal’s confirmed requirements for the final upload.
 
-[Kishan’s source audit](https://github.com/Pradhyut21/Proof-pay/issues/2) contains pinned entry points for MeasureBench, ETH gauge reader, CLEVR, DynaMath and VLMEvalKit. Use these as design references and verify permissions before reusing assets, models or code. [Official schedule and eligibility](https://hack2skill.com/event/innodata/)
+[Kishan’s source audit](https://github.com/Pradhyut21/Panel_Proof/issues/2) contains pinned entry points for MeasureBench, ETH gauge reader, CLEVR, DynaMath and VLMEvalKit. Use these as design references and verify permissions before reusing assets, models or code. [Official schedule and eligibility](https://hack2skill.com/event/innodata/)

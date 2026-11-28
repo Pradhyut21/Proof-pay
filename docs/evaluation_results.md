@@ -11,9 +11,9 @@ The same 50 development tasks passed preflight under C0, C1, and C3. The sample 
 | Clean raster pilot | Independent recovery compared with generator truth | 19 of 20 scenes recovered, exact agreement on all 19 recoveries. [Pilot report](results/integration_pilot.md) |
 | Rule implementation | Independent Python and Rust conversion and operating-state outcomes | 1,000 seeded scenes and 1,500 pump cases in each rule mode, zero mismatches. [Validation](validation.md#4-cross-implementation-parity) |
 | Holdout audit | Group and seed isolation, pair validity, and the marginal ALARM cue | v0.4 has 1,002 answerable tasks and 437 valid pairs. The balanced measured scope contains 758 frozen tasks. [Dataset card](dataset_card.md#current-private-holdout) |
-| Browser report | 71 matched tasks across 8 groups and 213 fixture attempt rows | Local scoring and report export verified. **DEMO ONLY**. [Browser and CI checks](https://github.com/Pradhyut21/Proof-pay/pull/25) |
+| Browser report | 71 matched tasks across 8 groups and 213 fixture attempt rows | Local scoring and report export verified. **DEMO ONLY**. [Browser and CI checks](https://github.com/Pradhyut21/Panel_Proof/pull/25) |
 | Human answerability | Two independent reviews of a prepared 50-task sample | 0 of 50 judged. [Review procedure](human_audit.md) |
-| Live model findings | Matched model runs and case analysis | Awaiting organizer model access and approved usage. [Evaluation issue](https://github.com/Pradhyut21/Proof-pay/issues/18) |
+| Live model findings | Matched model runs and case analysis | Awaiting organizer model access and approved usage. [Evaluation issue](https://github.com/Pradhyut21/Panel_Proof/issues/18) |
 
 ## Scope
 
