@@ -7,9 +7,9 @@
 | Artifact | Where to find it | Status |
 | --- | --- | --- |
 | Runnable source and setup | [README](../README.md#quickstart) · [Architecture](../docs/architecture.md) · [Reproduction guide](../docs/reproducibility.md) | Source and offline reproduction available. |
-| Sample tasks | [Public demo questions](../data/demo/public/tasks.jsonl) · [Rendered sample grid](../data/samples/contact_sheet.png) · [Worked pair](../README.md#one-question-three-panels) | Public development samples. The separate judge key is a team handoff artifact. |
+| Sample tasks | [Public demo questions](https://github.com/Pradhyut21/Panel_Proof/blob/main/data/demo/public/tasks.jsonl) · [Rendered sample grid](https://github.com/Pradhyut21/Panel_Proof/blob/main/data/samples/contact_sheet.png) · [Worked pair](../README.md#one-question-three-panels) | Public development samples. The separate judge key is a team handoff artifact. |
 | Validation evidence | [Validation](../docs/validation.md) · [Dataset card](../docs/dataset_card.md) · [Evaluation status](../docs/evaluation_results.md) | Automated evidence available. Independent human review is pending. |
-| Deck and walkthrough | [Video chapter guide](demo_script.md) · [Organizer requirements](../reference/SUBMISSION.md) | The 15-slide deck and 2:55 recording are complete. The team will supply the hosted video link. |
+| Deck and walkthrough | [Submission deck PDF](https://github.com/Pradhyut21/Panel_Proof/blob/main/submission/PanelProof_Innodata_Idea_Submission.pdf) · [Video chapter guide](demo_script.md) · [Organizer requirements](../reference/SUBMISSION.md) | The 15-slide deck and 2:55 recording are complete. The team will supply the hosted video link. |
 | Model findings | [Evaluation status](../docs/evaluation_results.md) · [Protocol](../evals/protocol.md) · [Issue #18](https://github.com/Pradhyut21/Panel_Proof/issues/18) | The matched 50-task development preflight passed for C0, C1, and C3. Live results are pending authorized model access. The recorded report uses **DEMO ONLY** fixtures. |
 | Licensing and provenance | [MIT code license](../LICENSE) · [Third-party notices](../THIRD_PARTY_NOTICES.md) · [Dataset sources](../docs/dataset_sources.md) | Source and dependency credits are documented. Terms for a separate generated dataset release are pending. |
 

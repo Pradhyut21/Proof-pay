@@ -6,7 +6,7 @@ Team **TXET** · KM Pradhyut and Sai Kishan · Innodata AI Hackathon, Track 2 ·
 
 PanelProof generates fictional water-pump panels with deterministic answers. An independent PNG verifier recovers the visible readings, and a Rust solver cross-checks the rule outcome. The local console lets judges generate a task, score an answer, and inspect its evidence.
 
-[Run the demo](#quickstart) · [Try a benchmark question](#one-question-three-panels) · [Review validation](#evidence-and-status) · [Submission handoff](submission/DELIVERABLE.md)
+[Run the demo](#quickstart) · [Try a benchmark question](#one-question-three-panels) · [Review validation](#evidence-and-status) · [Submission deck](https://github.com/Pradhyut21/Panel_Proof/blob/main/submission/PanelProof_Innodata_Idea_Submission.pdf) · [Submission handoff](submission/DELIVERABLE.md)
 
 **Evidence status** · Local scoring, reproducibility, and automated validation are available. Live model results and human answerability review are pending. The console labels offline fixture reports **DEMO ONLY**.
 
