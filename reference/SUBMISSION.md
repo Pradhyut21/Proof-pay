@@ -27,4 +27,4 @@ The public timeline and FAQ give **6 December 2026 at 11:59 PM IST**. The live e
 - [ ] Verify the permitted model API access and usage limits before paid inference.
 - [ ] Verify which interface, sample formats, and demo artifacts the portal accepts. Confirm whether the portal accepts a separate judge key.
 
-The registered dashboard details remain pending in [#1 and #20](https://github.com/Pradhyut21/Proof-pay/issues?q=is%3Aissue+submission).
+The registered dashboard details remain pending in [#1 and #20](https://github.com/Pradhyut21/Panel_Proof/issues?q=is%3Aissue+submission).

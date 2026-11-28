@@ -5,4 +5,4 @@
 - Use CLEVR as a design reference for scene, render and question boundaries. [CLEVR source](https://github.com/facebookresearch/clevr-dataset-gen)
 - Use DynaMath as a reference for worst-case group metrics and VLMEvalKit for evaluation adapters. [DynaMath source](https://github.com/DynaMath/DynaMath) · [VLMEvalKit source](https://github.com/open-compass/VLMEvalKit)
 
-The pinned source inventory and full licensing audit are tracked in [#2](https://github.com/Pradhyut21/Proof-pay/issues/2).
+The pinned source inventory and full licensing audit are tracked in [#2](https://github.com/Pradhyut21/Panel_Proof/issues/2).

@@ -4,7 +4,7 @@ title: "PanelProof: a pixel-verified visual reasoning benchmark for fictional pu
 type: software
 version: 0.1.0
 license: MIT
-repository-code: "https://github.com/Pradhyut21/Proof-pay"
+repository-code: "https://github.com/Pradhyut21/Panel_Proof"
 authors:
   - alias: "Pradhyut21"
   - alias: "kishansaaai"

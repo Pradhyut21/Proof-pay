@@ -13,7 +13,7 @@ Start with the [judge quickstart](../README.md#quickstart) for a browser demonst
 | Audit dataset | `./run.sh audit` | `.\run.ps1 audit` |
 | Rebuild, audit and create a DEMO ONLY report | `./run.sh reproduce` | `.\run.ps1 reproduce` |
 
-Build the web app once with `pnpm --dir apps/web build`, then add `--web` to the smoke command to include its routes. The default dataset output is `data/build/main`. Reduce `workers` in [benchmark configuration](../configs/benchmark.yaml) if memory is limited. [Smoke and CI](https://github.com/Pradhyut21/Proof-pay/actions/runs/45449233021) · [Compose and macOS checks](https://github.com/Pradhyut21/Proof-pay/actions/runs/45449232901)
+Build the web app once with `pnpm --dir apps/web build`, then add `--web` to the smoke command to include its routes. The default dataset output is `data/build/main`. Reduce `workers` in [benchmark configuration](../configs/benchmark.yaml) if memory is limited. [Smoke and CI](https://github.com/Pradhyut21/Panel_Proof/actions/runs/45449233021) · [Compose and macOS checks](https://github.com/Pradhyut21/Panel_Proof/actions/runs/45449232901)
 
 ## Artifact hashes and decoded pixels
 
@@ -47,7 +47,7 @@ Record both results with the platform and library versions. The verifier retains
 
 ## Start from an extracted source ZIP
 
-After bootstrap, create a local demo bundle before you start the API or Compose. The archive carries the code and documentation. The exact reviewed sample bundle is available in the [Git checkout](https://github.com/Pradhyut21/Proof-pay/tree/main/data/demo).
+After bootstrap, create a local demo bundle before you start the API or Compose. The archive carries the code and documentation. The exact reviewed sample bundle is available in the [Git checkout](https://github.com/Pradhyut21/Panel_Proof/tree/main/data/demo).
 
 ```sh
 uv run --project python --python 3.11 --locked python -m panelproof.cli factory --seed source-demo --count 3 --out data/demo
